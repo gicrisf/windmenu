@@ -82,9 +82,13 @@ fn execute_wlines(state: Arc<AppState>) {
             .spawn(); 
 
         // Join link names for stdin 
-        let joined = state
-            .start_menu_map
-            .keys()
+        let joined = state.start_menu_map.keys()
+            .chain([String::from("shutdown"), 
+                String::from("hybernate"),
+                String::from("reboot"), 
+                String::from("logoff"),    
+                // String::from("splitwt")
+            ].iter())
             .fold(String::new(), |acc, s| acc + "\n" + s);
 
         if let Ok(mut child) = output {
@@ -100,15 +104,50 @@ fn execute_wlines(state: Arc<AppState>) {
                 Err(e) => panic!("invalid UTF8!: {}", e),
             };
 
-            // Get the path from the selected
-            if let Some(selected_path) = state.start_menu_map.get(s.trim()) {
-                Command::new("cmd")
-                    .args(&["/C", "start", "", selected_path
-                            .as_os_str()
-                            .to_str()
-                            .expect("Failed to convert path")])
-                    .spawn()
-                    .expect("Failed to start program");
+            let selected = s.trim();
+            match selected {
+                "shutdown" => {
+                    Command::new("cmd")
+                        .args(&["/C", "shutdown.exe", "/si"])
+                        .spawn()
+                        .expect("Failed to run shutdown");
+                },
+                "reboot" => {
+                    Command::new("cmd")
+                        .args(&["/C", "shutdown.exe", "/r"])
+                        .spawn()
+                        .expect("Failed to run shutdown");
+                    },
+                "logoff" => {
+                    Command::new("cmd")
+                        .args(&["/C", "shutdown.exe", "/li"])
+                        .spawn()
+                        .expect("Failed to run shutdown");
+                    },
+                "hybernate" => {
+                    Command::new("cmd")
+                        .args(&["/C", "shutdown.exe", "/h"])
+                        .spawn()
+                        .expect("Failed to run shutdown");
+                    },
+                // "splitwt" => {
+                //     Command::new("cmd")
+                //         .args(&["/C", "wt -p 'Windows PowerShell' ; split-pane -p 'Ubuntu 22.04.5 LTS'"])
+                //         .spawn()
+                //         .expect("Failed to run wt");
+                // },
+                _ => {
+                    // Get the path from the selected
+                    if let Some(selected_path) = state.start_menu_map.get(selected) {
+                        Command::new("cmd")
+                            .args(&["/C", "start", "", selected_path
+                                    .as_os_str()
+                                    .to_str()
+                                    .expect("Failed to convert path")])
+                            .spawn()
+                            .expect("Failed to start program");
+                    }
+                }
             }  
         } 
 
@@ -118,9 +157,8 @@ fn execute_wlines(state: Arc<AppState>) {
 }
 
 fn main() {    
-    let start_menu_paths = get_start_menu_paths();
-
     let mut start_menu_map = HashMap::new();
+    let start_menu_paths = get_start_menu_paths();
     for path in start_menu_paths {
         start_menu_map.extend(find_lnk_files(&path).unwrap());
     }
