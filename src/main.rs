@@ -19,7 +19,77 @@ enum AppCommand {
 
 #[derive(Debug, Deserialize)]
 struct Config {
+    options: WlinesConfig,
     commands: Vec<CommandConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WlinesConfig {
+    l: Option<usize>,       // Lines to show
+    p: Option<String>,      // Prompt text
+    fm: Option<String>,     // Filter mode
+    si: Option<usize>,      // Selected index
+    px: Option<usize>,      // Window padding
+    wx: Option<usize>,      // Window width
+    bg: Option<String>,     // Background color
+    fg: Option<String>,     // Foreground color
+    sbg: Option<String>,    // Selected bg color
+    sfg: Option<String>,    // Selected fg color
+    tbg: Option<String>,    // Text input bg
+    tfg: Option<String>,    // Text input fg
+    f: Option<String>,      // Font name
+    fs: Option<usize>,      // Font size
+}
+
+impl WlinesConfig {
+    pub fn to_args(&self) -> Vec<String> {
+        let mut args = Vec::new();
+        
+        if let Some(l) = self.l {
+            args.extend(["-l".to_string(), l.to_string()]);
+        }
+        if let Some(p) = &self.p {
+            args.extend(["-p".to_string(), p.clone()]);
+        }
+        if let Some(fm) = &self.fm {
+            args.extend(["-fm".to_string(), fm.clone()]);
+        }
+        if let Some(si) = self.si {
+            args.extend(["-si".to_string(), si.to_string()]);
+        }
+        if let Some(px) = self.px {
+            args.extend(["-px".to_string(), px.to_string()]);
+        }
+        if let Some(wx) = self.wx {
+            args.extend(["-wx".to_string(), wx.to_string()]);
+        }
+        if let Some(bg) = &self.bg {
+            args.extend(["-bg".to_string(), bg.clone()]);
+        }
+        if let Some(fg) = &self.fg {
+            args.extend(["-fg".to_string(), fg.clone()]);
+        }
+        if let Some(sbg) = &self.sbg {
+            args.extend(["-sbg".to_string(), sbg.clone()]);
+        }
+        if let Some(sfg) = &self.sfg {
+            args.extend(["-sfg".to_string(), sfg.clone()]);
+        }
+        if let Some(tbg) = &self.tbg {
+            args.extend(["-tbg".to_string(), tbg.clone()]);
+        }
+        if let Some(tfg) = &self.tfg {
+            args.extend(["-tfg".to_string(), tfg.clone()]);
+        }
+        if let Some(f) = &self.f {
+            args.extend(["-f".to_string(), f.clone()]);
+        }
+        if let Some(fs) = self.fs {
+            args.extend(["-fs".to_string(), fs.to_string()]);
+        }
+        
+        args
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,7 +144,7 @@ fn is_shortcut_pressed() -> bool {
 }
 
 fn load_config() -> Option<Config> {
-    let config_path = PathBuf::from("commands.toml");
+    let config_path = PathBuf::from("config.toml");
     if !config_path.exists() {
         return None;
     }
@@ -96,10 +166,10 @@ fn initialize_commands() -> HashMap<String, AppCommand> {
     }
 
     // Add built-in custom commands
-    commands.insert("shutdown".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/s".to_string()]));
-    commands.insert("reboot".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/r".to_string()]));
-    commands.insert("logoff".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/l".to_string()]));
-    commands.insert("hybernate".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/h".to_string()]));
+    commands.insert("shutdown (shutdown)".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/s".to_string()]));
+    commands.insert("reboot (shutdown)".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/r".to_string()]));
+    commands.insert("logoff (shutdown)".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/l".to_string()]));
+    commands.insert("hybernate (shutdown)".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/h".to_string()]));
 
     // Add configured commands from TOML
     if let Some(config) = load_config() {
@@ -123,14 +193,16 @@ fn execute_wlines(state: Arc<AppState>) {
     // Set running flag
     *state.process_running.lock().unwrap() = true;
 
+    let options;
+    if let Some(config) = load_config() {
+        options = config.options.to_args(); 
+    } else {
+        options = vec![];
+    }
+
     thread::spawn(move || {
         let output = Command::new("wlines.exe")
-            .args(&[
-                "-sbg", "#285577",
-                "-sfg", "#ffffff",
-                "-fs", "16",
-                "-p", "oi mbare, run something"
-            ])
+            .args(&options)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

@@ -1,0 +1,34 @@
+[options]
+# Amount of lines to show in list
+# l = 0
+# Prompt to show before input
+p = "oi mbare, run something"
+# Sets the desired filter mode (see list below)
+# fm = ""
+# Initial selected line index
+# si = 0
+# Sets padding on window
+# px = 0
+# Sets width of the window and centers it on the screen
+# wx = 0
+# Background color
+# bg = ""
+# Foreground color
+# fg = ""
+# Selected background color
+sbg = "#285577"
+# Selected foreground color
+sfg = "#ffffff"
+# Text input background color
+# tbg = ""
+# Text input foreground color
+# tfg = ""
+# Font name
+# f = ""
+# Font size
+fs = 16
+
+# Basic example
+[[commands]]
+name = "beep beep"
+args = ["powershell", "[System.Media.SystemSounds]::Beep.Play()"]
