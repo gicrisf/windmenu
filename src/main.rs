@@ -8,9 +8,15 @@ use std::fs;
 use std::path::{ Path, PathBuf };
 use winapi::um::winuser::{ GetAsyncKeyState, VK_LWIN, VK_SPACE };
 
+#[derive(Debug)]
+enum AppCommand {
+    Start(PathBuf),
+    Shutdown(String),
+}
+
 struct AppState {
     process_running: Mutex<bool>,
-    start_menu_map: HashMap<String, PathBuf>,
+    commands: HashMap<String, AppCommand>, 
 }
 
 fn get_start_menu_paths() -> Vec<PathBuf> {
@@ -55,6 +61,27 @@ fn is_shortcut_pressed() -> bool {
     }
 }
 
+fn initialize_commands() -> HashMap<String, AppCommand> {
+    let mut commands = HashMap::new();
+
+    // Add Start menu commands
+    for path in get_start_menu_paths() {
+        if let Ok(lnk_files) = find_lnk_files(&path) {
+            for (name, path) in lnk_files {
+                commands.insert(name, AppCommand::Start(path));
+            }
+        }
+    }
+
+    // Add custom commands
+    commands.insert("shutdown".to_string(), AppCommand::Shutdown("/s".to_string()));
+    commands.insert("reboot".to_string(), AppCommand::Shutdown("/r".to_string()));
+    commands.insert("logoff".to_string(), AppCommand::Shutdown("/l".to_string()));
+    commands.insert("hybernate".to_string(), AppCommand::Shutdown("/h".to_string()));
+
+    commands
+}
+
 fn execute_wlines(state: Arc<AppState>) {
     // Check if already running
     {
@@ -81,74 +108,35 @@ fn execute_wlines(state: Arc<AppState>) {
             .stderr(Stdio::piped())
             .spawn(); 
 
-        // Join link names for stdin 
-        let joined = state.start_menu_map.keys()
-            .chain([String::from("shutdown"), 
-                String::from("hybernate"),
-                String::from("reboot"), 
-                String::from("logoff"),    
-                // String::from("splitwt")
-            ].iter())
+        // Join command names for stdin 
+        let joined = state.commands.keys()
             .fold(String::new(), |acc, s| acc + "\n" + s);
 
         if let Ok(mut child) = output {
             if let Some(stdin) = child.stdin.as_mut() {
                 stdin.write_all(joined.as_bytes()).expect("Failed to write to stdin");
             }
-            // Then you can wait for the output
+
             let output = child.wait_with_output().expect("Failed to read output");
+            let selected = std::str::from_utf8(&output.stdout)
+                .unwrap_or("")
+                .trim();
 
-            // Convert UTF8 vec of bytes
-            let s = match std::str::from_utf8(&output.stdout) {
-                Ok(v) => v,
-                Err(e) => panic!("invalid UTF8!: {}", e),
-            };
-
-            let selected = s.trim();
-            match selected {
-                "shutdown" => {
+            match state.commands.get(selected) {
+                Some(AppCommand::Start(path)) => {
                     Command::new("cmd")
-                        .args(&["/C", "shutdown.exe", "/si"])
+                        .args(&["/C", "start", "", path.as_os_str().to_str().unwrap()])
+                        .spawn()
+                        .expect("Failed to start program");
+                },
+                Some(AppCommand::Shutdown(arg)) => {
+                    Command::new("cmd")
+                        .args(&["/C", "shutdown.exe", arg])
                         .spawn()
                         .expect("Failed to run shutdown");
                 },
-                "reboot" => {
-                    Command::new("cmd")
-                        .args(&["/C", "shutdown.exe", "/r"])
-                        .spawn()
-                        .expect("Failed to run shutdown");
-                    },
-                "logoff" => {
-                    Command::new("cmd")
-                        .args(&["/C", "shutdown.exe", "/li"])
-                        .spawn()
-                        .expect("Failed to run shutdown");
-                    },
-                "hybernate" => {
-                    Command::new("cmd")
-                        .args(&["/C", "shutdown.exe", "/h"])
-                        .spawn()
-                        .expect("Failed to run shutdown");
-                    },
-                // "splitwt" => {
-                //     Command::new("cmd")
-                //         .args(&["/C", "wt -p 'Windows PowerShell' ; split-pane -p 'Ubuntu 22.04.5 LTS'"])
-                //         .spawn()
-                //         .expect("Failed to run wt");
-                // },
-                _ => {
-                    // Get the path from the selected
-                    if let Some(selected_path) = state.start_menu_map.get(selected) {
-                        Command::new("cmd")
-                            .args(&["/C", "start", "", selected_path
-                                    .as_os_str()
-                                    .to_str()
-                                    .expect("Failed to convert path")])
-                            .spawn()
-                            .expect("Failed to start program");
-                    }
-                }
-            }  
+                None => {} // No action for unknown commands
+            }
         } 
 
         // Reset flag when done
@@ -157,15 +145,10 @@ fn execute_wlines(state: Arc<AppState>) {
 }
 
 fn main() {    
-    let mut start_menu_map = HashMap::new();
-    let start_menu_paths = get_start_menu_paths();
-    for path in start_menu_paths {
-        start_menu_map.extend(find_lnk_files(&path).unwrap());
-    }
-
+    let commands = initialize_commands();
     let state = Arc::new(AppState {
         process_running: Mutex::new(false),
-        start_menu_map,
+        commands,
     });
 
     loop {
