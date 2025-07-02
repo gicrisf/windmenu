@@ -1,3 +1,0 @@
-[[commands]]
-name = "emacs (via WSL 1)"
-args = ["wsl", "-d", "Ubuntu-22.04", "-e", "env", "DISPLAY=localhost:0.0", "emacs"]

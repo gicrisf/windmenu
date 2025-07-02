@@ -14,7 +14,7 @@ use toml;
 enum AppCommand {
     Start(PathBuf),            // For Start menu shortcuts
     Shutdown(Vec<String>),      // For hardcoded shutdown commands
-    Configured(Vec<String>),  // For TOML configured commands
+    Configured(Vec<String>),  // For configured commands
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,6 +101,7 @@ struct CommandConfig {
 struct AppState {
     process_running: Mutex<bool>,
     commands: HashMap<String, AppCommand>,
+    wlines_args: Vec<String>,
 }
 
 fn get_start_menu_paths() -> Vec<PathBuf> {
@@ -148,12 +149,11 @@ fn load_config() -> Option<Config> {
     if !config_path.exists() {
         return None;
     }
-
     let config_content = fs::read_to_string(config_path).ok()?;
     toml::from_str(&config_content).ok()
 }
 
-fn initialize_commands() -> HashMap<String, AppCommand> {
+fn initialize_app_state() -> AppState {
     let mut commands = HashMap::new();
 
     // Add Start menu commands
@@ -171,14 +171,21 @@ fn initialize_commands() -> HashMap<String, AppCommand> {
     commands.insert("logoff (shutdown)".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/l".to_string()]));
     commands.insert("hybernate (shutdown)".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/h".to_string()]));
 
-    // Add configured commands from TOML
-    if let Some(config) = load_config() {
+    // Load config and process commands/options
+    let config = load_config();
+    let wlines_args = config.as_ref().map_or(vec![], |c| c.options.to_args());
+    
+    if let Some(config) = config {
         for cmd in config.commands {
             commands.insert(cmd.name, AppCommand::Configured(cmd.args));
         }
     }
 
-    commands
+    AppState {
+        process_running: Mutex::new(false),
+        commands,
+        wlines_args,
+    }
 }
 
 fn execute_wlines(state: Arc<AppState>) {
@@ -191,18 +198,11 @@ fn execute_wlines(state: Arc<AppState>) {
     }
 
     // Set running flag
-    *state.process_running.lock().unwrap() = true;
-
-    let options;
-    if let Some(config) = load_config() {
-        options = config.options.to_args(); 
-    } else {
-        options = vec![];
-    }
+    *state.process_running.lock().unwrap() = true; 
 
     thread::spawn(move || {
         let output = Command::new("wlines.exe")
-            .args(&options)
+            .args(&state.wlines_args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -243,12 +243,7 @@ fn execute_wlines(state: Arc<AppState>) {
 }
 
 fn main() {    
-    let commands = initialize_commands();
-    let state = Arc::new(AppState {
-        process_running: Mutex::new(false),
-        commands,
-    });
-
+    let state = Arc::new(initialize_app_state()); 
     loop {
         if is_shortcut_pressed() {
             execute_wlines(state.clone());

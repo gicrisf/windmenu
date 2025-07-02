@@ -32,3 +32,7 @@ fs = 16
 [[commands]]
 name = "beep beep"
 args = ["powershell", "[System.Media.SystemSounds]::Beep.Play()"]
+
+[[commands]]
+name = "emacs (via WSL 1)"
+args = ["wsl", "-d", "Ubuntu-22.04", "-e", "env", "DISPLAY=localhost:0.0", "emacs"]
