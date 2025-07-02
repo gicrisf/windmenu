@@ -5,29 +5,41 @@ use std::process::{Command, Stdio};
 use std::collections::HashMap;
 use std::env;
 use std::fs;
-use std::path::{ Path, PathBuf };
-use winapi::um::winuser::{ GetAsyncKeyState, VK_LWIN, VK_SPACE };
+use std::path::{Path, PathBuf};
+use winapi::um::winuser::{GetAsyncKeyState, VK_LWIN, VK_SPACE};
+use serde::Deserialize;
+use toml;
 
 #[derive(Debug)]
 enum AppCommand {
-    Start(PathBuf),
-    Shutdown(String),
+    Start(PathBuf),            // For Start menu shortcuts
+    Shutdown(Vec<String>),      // For hardcoded shutdown commands
+    Configured(Vec<String>),  // For TOML configured commands
+}
+
+#[derive(Debug, Deserialize)]
+struct Config {
+    commands: Vec<CommandConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CommandConfig {
+    name: String,
+    args: Vec<String>,
 }
 
 struct AppState {
     process_running: Mutex<bool>,
-    commands: HashMap<String, AppCommand>, 
+    commands: HashMap<String, AppCommand>,
 }
 
 fn get_start_menu_paths() -> Vec<PathBuf> {
     let mut paths = Vec::new();
     
-    // User Start Menu
     if let Ok(appdata) = env::var("APPDATA") {
         paths.push(PathBuf::from(appdata).join("Microsoft\\Windows\\Start Menu"));
     }
     
-    // All Users Start Menu
     if let Ok(program_data) = env::var("ProgramData") {
         paths.push(PathBuf::from(program_data).join("Microsoft\\Windows\\Start Menu"));
     }
@@ -56,9 +68,19 @@ fn find_lnk_files(dir: &Path) -> std::io::Result<HashMap<String, PathBuf>> {
 
 fn is_shortcut_pressed() -> bool {
     unsafe {
-            (GetAsyncKeyState(VK_LWIN) & 0x8000u16 as i16 != 0)
-            && (GetAsyncKeyState(VK_SPACE) & 0x8000u16 as i16 != 0)
+        (GetAsyncKeyState(VK_LWIN) & 0x8000u16 as i16 != 0) &&
+        (GetAsyncKeyState(VK_SPACE) & 0x8000u16 as i16 != 0)
     }
+}
+
+fn load_config() -> Option<Config> {
+    let config_path = PathBuf::from("commands.toml");
+    if !config_path.exists() {
+        return None;
+    }
+
+    let config_content = fs::read_to_string(config_path).ok()?;
+    toml::from_str(&config_content).ok()
 }
 
 fn initialize_commands() -> HashMap<String, AppCommand> {
@@ -73,11 +95,18 @@ fn initialize_commands() -> HashMap<String, AppCommand> {
         }
     }
 
-    // Add custom commands
-    commands.insert("shutdown".to_string(), AppCommand::Shutdown("/s".to_string()));
-    commands.insert("reboot".to_string(), AppCommand::Shutdown("/r".to_string()));
-    commands.insert("logoff".to_string(), AppCommand::Shutdown("/l".to_string()));
-    commands.insert("hybernate".to_string(), AppCommand::Shutdown("/h".to_string()));
+    // Add built-in custom commands
+    commands.insert("shutdown".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/s".to_string()]));
+    commands.insert("reboot".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/r".to_string()]));
+    commands.insert("logoff".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/l".to_string()]));
+    commands.insert("hybernate".to_string(), AppCommand::Shutdown(vec!["shutdown.exe".to_string(), "/h".to_string()]));
+
+    // Add configured commands from TOML
+    if let Some(config) = load_config() {
+        for cmd in config.commands {
+            commands.insert(cmd.name, AppCommand::Configured(cmd.args));
+        }
+    }
 
     commands
 }
@@ -94,7 +123,6 @@ fn execute_wlines(state: Arc<AppState>) {
     // Set running flag
     *state.process_running.lock().unwrap() = true;
 
-    // Spawn thread to run and monitor the process
     thread::spawn(move || {
         let output = Command::new("wlines.exe")
             .args(&[
@@ -108,7 +136,6 @@ fn execute_wlines(state: Arc<AppState>) {
             .stderr(Stdio::piped())
             .spawn(); 
 
-        // Join command names for stdin 
         let joined = state.commands.keys()
             .fold(String::new(), |acc, s| acc + "\n" + s);
 
@@ -129,17 +156,16 @@ fn execute_wlines(state: Arc<AppState>) {
                         .spawn()
                         .expect("Failed to start program");
                 },
-                Some(AppCommand::Shutdown(arg)) => {
-                    Command::new("cmd")
-                        .args(&["/C", "shutdown.exe", arg])
+                Some(AppCommand::Shutdown(args)) | Some(AppCommand::Configured(args)) => {
+                    Command::new(&args[0])
+                        .args(&args[1..])
                         .spawn()
-                        .expect("Failed to run shutdown");
+                        .expect("Failed to execute command");
                 },
-                None => {} // No action for unknown commands
+                None => {}
             }
         } 
 
-        // Reset flag when done
         *state.process_running.lock().unwrap() = false;
     });
 }

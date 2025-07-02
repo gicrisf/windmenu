@@ -1,0 +1,4 @@
+# Just a random example
+[[commands]]
+name = "splitwt"
+args = ["wt", "-p", "Windows PowerShell", ";", "split-pane", "-p", "Ubuntu"]
