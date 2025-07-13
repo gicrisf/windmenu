@@ -36,3 +36,118 @@ args = ["powershell", "[System.Media.SystemSounds]::Beep.Play()"]
 [[commands]]
 name = "emacs (via WSL 1)"
 args = ["wsl", "-d", "Ubuntu-22.04", "-e", "env", "DISPLAY=localhost:0.0", "emacs"]
+
+[[commands]]
+name = "wt windows terminal"
+args = ["wt"]
+
+# Key combinations
+#
+# Tabs
+[[commands]]
+name = "wt key combo next tab"
+keys = ["CTRL", "ALT", "RIGHT"]
+
+[[commands]]
+name = "wt key combo prev tab"
+keys = ["CTRL", "ALT", "LEFT"]
+
+[[commands]]
+name = "wt key combo settings"
+keys = ["CTRL", "COMMA"]
+
+[[commands]]
+name = "wt key combo new tab"
+keys = ["CTRL", "SHIFT", "T"]
+
+# Font size
+[[commands]]
+name = "wt key combo decrease font size"
+keys = ["CTRL", "-"]
+
+[[commands]]
+name = "wt key combo increase font size"
+keys = ["CTRL", "+"]
+
+[[commands]]
+name = "wt key combo reset font size"
+keys = ["CTRL", "0"]
+
+# Panes
+[[commands]]
+name = "wt key combo duplicate pane"
+keys = ["ALT", "SHIFT", "D"]
+
+[[commands]]
+name = "wt key combo duplicate pane and split down"
+keys = ["ALT", "SHIFT", "-"]
+
+[[commands]]
+name = "wt key combo duplicate pane and split right"
+keys = ["ALT", "SHIFT", "+"]
+
+[[commands]]
+name = "wt key combo close pane"
+keys = ["CTRL", "SHIFT", "W"]
+
+[[commands]]
+name = "wt key combo focus up"
+keys = ["ALT", "UP"]
+
+[[commands]]
+name = "wt key combo focus down"
+keys = ["ALT", "DOWN"]
+
+[[commands]]
+name = "wt key combo focus left"
+keys = ["ALT", "LEFT"]
+
+[[commands]]
+name = "wt key combo focus right"
+keys = ["ALT", "RIGHT"]
+
+[[commands]]
+name = "wt key combo resize pane up"
+keys = ["ALT", "SHIFT", "UP"]
+
+[[commands]]
+name = "wt key combo resize pane down"
+keys = ["ALT", "SHIFT", "DOWN"]
+
+[[commands]]
+name = "wt key combo resize pane left"
+keys = ["ALT", "SHIFT", "LEFT"]
+
+[[commands]]
+name = "wt key combo resize pane right"
+keys = ["ALT", "SHIFT", "RIGHT"]
+
+# other stuff
+[[commands]]
+name = "wt key combo find"
+keys = ["CTRL", "SHIFT", "F"]
+
+[[commands]]
+name = "wt key combo new window"
+keys = ["CTRL", "SHIFT", "N"]
+
+[[commands]]
+name = "wt key combo toggle mark mode"
+keys = ["CTRL", "SHIFT", "M"]
+
+# System power commands
+[[commands]]
+name = "shutdown (poweroff)"
+args = ["shutdown.exe", "/s"]
+
+[[commands]]
+name = "reboot"
+args = ["shutdown.exe", "/r"]
+
+[[commands]]
+name = "logoff"
+args = ["shutdown.exe", "/l"]
+
+[[commands]]
+name = "hibernate"
+args = ["shutdown.exe", "/h"]
