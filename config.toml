@@ -1,3 +1,12 @@
+# Custom shortcut keys (default is WIN+SPACE if not specified)
+# Examples:
+# shortcut = ["WIN", "SPACE"]     # Default Win+Space
+# shortcut = ["CTRL", "ALT", "X"] # Ctrl+Alt+X
+# shortcut = ["ALT", "F2"]        # Alt+F2
+# shortcut = ["WIN", "R"]         # Win+R (like Windows Run dialog)
+# Uncomment and modify the line below to use a custom shortcut:
+# shortcut = ["CTRL", "ALT", "SPACE"]
+
 [options]
 # Amount of lines to show in list
 # l = 0
@@ -41,85 +50,84 @@ args = ["wsl", "-d", "Ubuntu-22.04", "-e", "env", "DISPLAY=localhost:0.0", "emac
 name = "wt windows terminal"
 args = ["wt"]
 
-# Key combinations
-#
+## Key combinations
 # Tabs
 [[commands]]
-name = "wt key combo next tab"
+name = "wt next tab (key combo)"
 keys = ["CTRL", "ALT", "RIGHT"]
 
 [[commands]]
-name = "wt key combo prev tab"
+name = "wt prev tab (key combo)"
 keys = ["CTRL", "ALT", "LEFT"]
 
 [[commands]]
-name = "wt key combo settings"
+name = "wt settings (key combo)"
 keys = ["CTRL", "COMMA"]
 
 [[commands]]
-name = "wt key combo new tab"
+name = "wt new tab (key combo)"
 keys = ["CTRL", "SHIFT", "T"]
 
 # Font size
 [[commands]]
-name = "wt key combo decrease font size"
+name = "wt decrease font size (key combo)"
 keys = ["CTRL", "-"]
 
 [[commands]]
-name = "wt key combo increase font size"
+name = "wt increase font size (key combo)"
 keys = ["CTRL", "+"]
 
 [[commands]]
-name = "wt key combo reset font size"
+name = "wt reset font size (key combo)"
 keys = ["CTRL", "0"]
 
 # Panes
 [[commands]]
-name = "wt key combo duplicate pane"
+name = "wt duplicate pane (key combo)"
 keys = ["ALT", "SHIFT", "D"]
 
 [[commands]]
-name = "wt key combo duplicate pane and split down"
+name = "wt duplicate pane and split down (key combo)"
 keys = ["ALT", "SHIFT", "-"]
 
 [[commands]]
-name = "wt key combo duplicate pane and split right"
+name = "wt duplicate pane and split right (key combo)"
 keys = ["ALT", "SHIFT", "+"]
 
 [[commands]]
-name = "wt key combo close pane"
+name = "wt close pane (key combo)"
 keys = ["CTRL", "SHIFT", "W"]
 
 [[commands]]
-name = "wt key combo focus up"
+name = "wt focus up (key combo)"
 keys = ["ALT", "UP"]
 
 [[commands]]
-name = "wt key combo focus down"
+name = "wt focus down (key combo)"
 keys = ["ALT", "DOWN"]
 
 [[commands]]
-name = "wt key combo focus left"
+name = "wt focus left (key combo)"
 keys = ["ALT", "LEFT"]
 
 [[commands]]
-name = "wt key combo focus right"
+name = "wt focus right (key combo)"
 keys = ["ALT", "RIGHT"]
 
 [[commands]]
-name = "wt key combo resize pane up"
+name = "wt resize pane up (key combo)"
 keys = ["ALT", "SHIFT", "UP"]
 
 [[commands]]
-name = "wt key combo resize pane down"
+name = "wt resize pane down (key combo)"
 keys = ["ALT", "SHIFT", "DOWN"]
 
 [[commands]]
-name = "wt key combo resize pane left"
+name = "wt resize pane left (key combo)"
 keys = ["ALT", "SHIFT", "LEFT"]
 
 [[commands]]
-name = "wt key combo resize pane right"
+name = "wt resize pane right (key combo)"
 keys = ["ALT", "SHIFT", "RIGHT"]
 
 # other stuff
@@ -134,6 +142,10 @@ keys = ["CTRL", "SHIFT", "N"]
 [[commands]]
 name = "wt key combo toggle mark mode"
 keys = ["CTRL", "SHIFT", "M"]
+
+[[commands]]
+name = "maximize key combo"
+keys = ["WIN", "UP"]
 
 # System power commands
 [[commands]]
@@ -151,3 +163,8 @@ args = ["shutdown.exe", "/l"]
 [[commands]]
 name = "hibernate"
 args = ["shutdown.exe", "/h"]
+
+# File manager commands
+[[commands]]
+name = "projects (D:)"
+args = ["yazi", "D:/projects"]

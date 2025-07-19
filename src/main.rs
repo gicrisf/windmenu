@@ -1,38 +1,56 @@
-use std::fs;
-use std::env;
-use std::thread;
-use std::time;
+use std::{thread, time};
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::process::{Command, Stdio};
 use std::collections::HashMap;
+use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::process::CommandExt;
-
 use winapi::um::winuser::{
-    GetAsyncKeyState, SendInput, 
-    INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, 
-    VK_LWIN, VK_SPACE, SW_RESTORE, VK_MENU, VK_SHIFT, VK_CAPITAL
+    GetAsyncKeyState, SendInput,
+    INPUT, INPUT_KEYBOARD, SW_RESTORE,
+    KEYBDINPUT, KEYEVENTF_KEYUP,
+    VK_MENU, VK_SHIFT, VK_CAPITAL, VK_CONTROL, VK_TAB,
+    VK_ESCAPE, VK_LWIN, VK_SPACE, VK_RETURN,
+    VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN,
+    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6,
+    VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12,
+    VK_OEM_COMMA, VK_OEM_PERIOD,
+    VK_OEM_1, VK_OEM_2, VK_OEM_3, VK_OEM_4,
+    VK_OEM_5, VK_OEM_6, VK_OEM_7,
+    VK_OEM_MINUS, VK_OEM_PLUS
 };
-use winapi::um::fileapi::{CreateFileW, WriteFile, ReadFile, OPEN_EXISTING};
+use winapi::um::fileapi::{
+    CreateFileW, WriteFile, ReadFile,
+    OPEN_EXISTING, GetFileAttributesW,
+    INVALID_FILE_ATTRIBUTES
+};
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
-use winapi::um::winnt::{GENERIC_READ, GENERIC_WRITE};
+use winapi::um::winnt::{GENERIC_READ, GENERIC_WRITE, FILE_ATTRIBUTE_REPARSE_POINT};
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::tlhelp32::{
-    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, 
+    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW,
     PROCESSENTRY32W, TH32CS_SNAPPROCESS
 };
 use winapi::um::winbase::{DETACHED_PROCESS, CREATE_NEW_PROCESS_GROUP};
 use winapi::um::shellapi::ShellExecuteW;
 use winapi::shared::minwindef::{DWORD, FALSE};
-
 use serde::Deserialize;
 use toml;
 
 // Named pipe name for communicating with wlines daemon
 const PIPE_NAME: &str = r"\\.\pipe\wlines_pipe";
+
+#[derive(Debug)]
+struct ReparsePointInfo {
+    name: String,
+    full_path: PathBuf,
+    length: u64,
+    attributes: u32,
+}
 
 fn launch_program(path: &Path) -> Result<(), String> {
     unsafe {
@@ -92,6 +110,7 @@ enum AppCommand {
 struct Config {
     options: WlinesConfig,
     commands: Vec<CommandConfig>,
+    shortcut: Option<Vec<String>>, // Custom shortcut keys (e.g., ["WIN", "SPACE"])
 }
 
 #[derive(Debug, Deserialize)]
@@ -181,6 +200,7 @@ struct AppState {
     process_running: Mutex<bool>,
     commands: HashMap<String, AppCommand>,
     wlines_args: Vec<String>,
+    shortcut_keys: Vec<String>,
 }
 
 fn get_start_menu_paths() -> Vec<PathBuf> {
@@ -195,6 +215,12 @@ fn get_start_menu_paths() -> Vec<PathBuf> {
     }
     
     paths
+}
+
+fn get_windows_apps_path() -> Option<PathBuf> {
+    env::var("LOCALAPPDATA")
+        .ok()
+        .map(|appdata| PathBuf::from(appdata).join("Microsoft\\WindowsApps"))
 }
 
 fn find_lnk_files(dir: &Path) -> std::io::Result<HashMap<String, PathBuf>> {
@@ -216,10 +242,24 @@ fn find_lnk_files(dir: &Path) -> std::io::Result<HashMap<String, PathBuf>> {
     Ok(lnk_files)
 }
 
-fn is_shortcut_pressed() -> bool {
-    unsafe {
-        (GetAsyncKeyState(VK_LWIN) & 0x8000u16 as i16 != 0) &&
-        (GetAsyncKeyState(VK_SPACE) & 0x8000u16 as i16 != 0)
+fn is_shortcut_pressed(shortcut_keys: &[String]) -> bool {
+    if shortcut_keys.is_empty() {
+        // Default shortcut: WIN + SPACE
+        unsafe {
+            (GetAsyncKeyState(VK_LWIN) & 0x8000u16 as i16 != 0) &&
+            (GetAsyncKeyState(VK_SPACE) & 0x8000u16 as i16 != 0)
+        }
+    } else {
+        // Check if all configured keys are pressed
+        unsafe {
+            shortcut_keys.iter().all(|key| {
+                if let Ok(vk_code) = parse_key_name_to_vk_code(key) {
+                    GetAsyncKeyState(vk_code as i32) & 0x8000u16 as i16 != 0
+                } else {
+                    false // If we can't parse the key, consider it not pressed
+                }
+            })
+        }
     }
 }
 
@@ -244,9 +284,28 @@ fn initialize_app_state() -> AppState {
         }
     }
 
+    // Add Windows Apps reparse points
+    if let Some(windows_apps_path) = get_windows_apps_path() {
+        if let Ok(reparse_points) = find_reparse_points(&windows_apps_path) {
+            for rp in reparse_points {
+                // Use the reparse point name without extension for the command key
+                let command_name = if let Some(stem) = rp.full_path.file_stem().and_then(|s| s.to_str()) {
+                    stem.to_string()
+                } else {
+                    rp.name.clone()
+                };
+                commands.insert(command_name, AppCommand::Start(rp.full_path));
+            }
+        }
+    }
+
     // Load config and process commands/options
     let config = load_config();
     let wlines_args = config.as_ref().map_or(vec![], |c| c.options.to_args());
+    let shortcut_keys = config.as_ref()
+        .and_then(|c| c.shortcut.as_ref())
+        .cloned()
+        .unwrap_or_else(|| vec!["WIN".to_string(), "SPACE".to_string()]);
     
     if let Some(config) = config {
         for cmd in config.commands {
@@ -265,6 +324,7 @@ fn initialize_app_state() -> AppState {
         process_running: Mutex::new(false),
         commands,
         wlines_args,
+        shortcut_keys,
     }
 }
 
@@ -483,6 +543,46 @@ fn send_to_wlines_daemon(data: &str) -> Option<String> {
     None
 }
 
+fn parse_key_name_to_vk_code(key: &str) -> Result<u16, String> {
+    match key.to_uppercase().as_str() {
+        "ALT" => Ok(VK_MENU as u16),
+        "CTRL" | "CONTROL" => Ok(VK_CONTROL as u16),
+        "SHIFT" => Ok(VK_SHIFT as u16),
+        "WIN" | "WINDOWS" => Ok(VK_LWIN as u16),
+        "TAB" => Ok(VK_TAB as u16),
+        "ESC" | "ESCAPE" => Ok(VK_ESCAPE as u16),
+        "SPACE" => Ok(VK_SPACE as u16),
+        "ENTER" => Ok(VK_RETURN as u16),
+        "CAPS" => Ok(VK_CAPITAL as u16),
+        // Function keys
+        "F1" => Ok(VK_F1 as u16), "F2" => Ok(VK_F2 as u16), "F3" => Ok(VK_F3 as u16), "F4" => Ok(VK_F4 as u16),
+        "F5" => Ok(VK_F5 as u16), "F6" => Ok(VK_F6 as u16), "F7" => Ok(VK_F7 as u16), "F8" => Ok(VK_F8 as u16),
+        "F9" => Ok(VK_F9 as u16), "F10" => Ok(VK_F10 as u16), "F11" => Ok(VK_F11 as u16), "F12" => Ok(VK_F12 as u16),
+        // Arrow keys
+        "LEFT" => Ok(VK_LEFT as u16), "UP" => Ok(VK_UP as u16), "RIGHT" => Ok(VK_RIGHT as u16), "DOWN" => Ok(VK_DOWN as u16),
+        // Number keys
+        "0" => Ok(0x30), "1" => Ok(0x31), "2" => Ok(0x32), "3" => Ok(0x33), "4" => Ok(0x34),
+        "5" => Ok(0x35), "6" => Ok(0x36), "7" => Ok(0x37), "8" => Ok(0x38), "9" => Ok(0x39),
+        // Special punctuation keys
+        "COMMA" | "," => Ok(VK_OEM_COMMA as u16),
+        "PERIOD" | "." => Ok(VK_OEM_PERIOD as u16),
+        "SEMICOLON" | ";" => Ok(VK_OEM_1 as u16),
+        "SLASH" | "/" => Ok(VK_OEM_2 as u16),
+        "BACKSLASH" | "\\" => Ok(VK_OEM_5 as u16),
+        "QUOTE" | "'" => Ok(VK_OEM_7 as u16),
+        "BACKTICK" | "`" => Ok(VK_OEM_3 as u16),
+        "MINUS" | "-" => Ok(VK_OEM_MINUS as u16),
+        "EQUALS" | "PLUS" | "=" | "+" => Ok(VK_OEM_PLUS as u16),
+        "LBRACKET" | "[" => Ok(VK_OEM_4 as u16),
+        "RBRACKET" | "]" => Ok(VK_OEM_6 as u16),
+        // Letter keys (A-Z)
+        key if key.len() == 1 && key.chars().next().unwrap().is_ascii_alphabetic() => {
+            Ok(key.chars().next().unwrap() as u16)
+        },
+        _ => Err(format!("Unknown key: {}", key)),
+    }
+}
+
 fn send_key_combination(keys: &[String]) -> Result<(), String> {
     if keys.is_empty() {
         return Err("No keys provided".to_string());
@@ -490,42 +590,7 @@ fn send_key_combination(keys: &[String]) -> Result<(), String> {
 
     // Parse virtual key codes from key names
     let vk_codes: Result<Vec<u16>, String> = keys.iter()
-        .map(|key| match key.to_uppercase().as_str() {
-            "ALT" => Ok(VK_MENU as u16),
-            "CTRL" | "CONTROL" => Ok(0x11), // VK_CONTROL
-            "SHIFT" => Ok(VK_SHIFT as u16),
-            "WIN" | "WINDOWS" => Ok(0x5B), // VK_LWIN
-            "TAB" => Ok(0x09), // VK_TAB
-            "ESC" | "ESCAPE" => Ok(0x1B), // VK_ESCAPE
-            "SPACE" => Ok(0x20), // VK_SPACE
-            "ENTER" => Ok(0x0D), // VK_RETURN
-            // Function keys
-            "F1" => Ok(0x70), "F2" => Ok(0x71), "F3" => Ok(0x72), "F4" => Ok(0x73),
-            "F5" => Ok(0x74), "F6" => Ok(0x75), "F7" => Ok(0x76), "F8" => Ok(0x77),
-            "F9" => Ok(0x78), "F10" => Ok(0x79), "F11" => Ok(0x7A), "F12" => Ok(0x7B),
-            // Arrow keys
-            "LEFT" => Ok(0x25), "UP" => Ok(0x26), "RIGHT" => Ok(0x27), "DOWN" => Ok(0x28),
-            // Number keys
-            "0" => Ok(0x30), "1" => Ok(0x31), "2" => Ok(0x32), "3" => Ok(0x33), "4" => Ok(0x34),
-            "5" => Ok(0x35), "6" => Ok(0x36), "7" => Ok(0x37), "8" => Ok(0x38), "9" => Ok(0x39),
-            // Special punctuation keys
-            "COMMA" | "," => Ok(0xBC), // VK_OEM_COMMA
-            "PERIOD" | "." => Ok(0xBE), // VK_OEM_PERIOD
-            "SEMICOLON" | ";" => Ok(0xBA), // VK_OEM_1
-            "SLASH" | "/" => Ok(0xBF), // VK_OEM_2
-            "BACKSLASH" | "\\" => Ok(0xDC), // VK_OEM_5
-            "QUOTE" | "'" => Ok(0xDE), // VK_OEM_7
-            "BACKTICK" | "`" => Ok(0xC0), // VK_OEM_3
-            "MINUS" | "-" => Ok(0xBD), // VK_OEM_MINUS
-            "EQUALS" | "PLUS" | "=" | "+" => Ok(0xBB), // VK_OEM_PLUS
-            "LBRACKET" | "[" => Ok(0xDB), // VK_OEM_4
-            "RBRACKET" | "]" => Ok(0xDD), // VK_OEM_6
-            // Letter keys (A-Z)
-            key if key.len() == 1 && key.chars().next().unwrap().is_ascii_alphabetic() => {
-                Ok(key.chars().next().unwrap() as u16)
-            },
-            _ => Err(format!("Unknown key: {}", key)),
-        })
+        .map(|key| parse_key_name_to_vk_code(key))
         .collect();
 
     let vk_codes = vk_codes?;
@@ -576,9 +641,11 @@ fn send_key_combination(keys: &[String]) -> Result<(), String> {
     }
 }
 
+// We need a dedicated function because CAPS is a special key
+// It behaves differently if pressed and released as single key or batched
+// We need to ensure the key is sent as a single key, so here we are
 fn toggle_caps_lock() -> Result<(), String> {
     unsafe {
-        // Send a single VK_CAPITAL key press (down + up) to toggle caps lock
         let mut input: INPUT = std::mem::zeroed();
         input.type_ = INPUT_KEYBOARD;
         *input.u.ki_mut() = KEYBDINPUT {
@@ -607,6 +674,12 @@ fn toggle_caps_lock() -> Result<(), String> {
 
 fn main() {    
     let args: Vec<String> = env::args().collect();
+    
+    // Check if this is a test command for reparse points
+    if args.len() > 1 && args[1] == "--test-reparse" {
+        print_reparse_points_info();
+        return;
+    }
     
     // Check if this is the detached background process
     if args.len() > 1 && args[1] == "--daemon" {
@@ -641,9 +714,132 @@ fn run_daemon() {
     let state = Arc::new(initialize_app_state()); 
     
     loop {
-        if is_shortcut_pressed() {
+        if is_shortcut_pressed(&state.shortcut_keys) {
             execute_wlines(state.clone());
         } 
         thread::sleep(time::Duration::from_millis(50));
+    }
+}
+
+fn find_reparse_points(dir: &Path) -> std::io::Result<Vec<ReparsePointInfo>> {
+    let mut reparse_points = Vec::new();
+    
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        let metadata = entry.metadata()?;
+        
+        // Check if it's a reparse point using Windows API
+        if is_reparse_point(&path) {
+            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                reparse_points.push(ReparsePointInfo {
+                    name: name.to_string(),
+                    full_path: path,
+                    length: metadata.len(),
+                    attributes: get_file_attributes(&entry.path()),
+                });
+            }
+        }
+    }
+    
+    // Sort by name, similar to PowerShell command
+    reparse_points.sort_by(|a, b| a.name.cmp(&b.name));
+    
+    Ok(reparse_points)
+}
+
+fn is_reparse_point(path: &Path) -> bool {
+    unsafe {
+        let path_wide: Vec<u16> = path.as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        
+        let attributes = GetFileAttributesW(path_wide.as_ptr());
+        
+        if attributes == INVALID_FILE_ATTRIBUTES {
+            return false;
+        }
+        
+        (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0
+    }
+}
+
+fn get_file_attributes(path: &Path) -> u32 {
+    unsafe {
+        let path_wide: Vec<u16> = path.as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        
+        let attributes = GetFileAttributesW(path_wide.as_ptr());
+        
+        if attributes == INVALID_FILE_ATTRIBUTES {
+            0
+        } else {
+            attributes
+        }
+    }
+}
+
+// Debug functions
+fn format_file_attributes(attributes: u32) -> String {
+    let mut attr_strings = Vec::new();
+    
+    if attributes & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        attr_strings.push("ReparsePoint");
+    }
+    if attributes & 0x1 != 0 { // FILE_ATTRIBUTE_READONLY
+        attr_strings.push("ReadOnly");
+    }
+    if attributes & 0x2 != 0 { // FILE_ATTRIBUTE_HIDDEN
+        attr_strings.push("Hidden");
+    }
+    if attributes & 0x4 != 0 { // FILE_ATTRIBUTE_SYSTEM
+        attr_strings.push("System");
+    }
+    if attributes & 0x10 != 0 { // FILE_ATTRIBUTE_DIRECTORY
+        attr_strings.push("Directory");
+    }
+    if attributes & 0x20 != 0 { // FILE_ATTRIBUTE_ARCHIVE
+        attr_strings.push("Archive");
+    }
+    
+    if attr_strings.is_empty() {
+        "Normal".to_string()
+    } else {
+        attr_strings.join(", ")
+    }
+}
+
+fn print_reparse_points_info() {
+    if let Some(windows_apps_path) = get_windows_apps_path() {
+        println!("Scanning Windows Apps directory: {:?}", windows_apps_path);
+        
+        match find_reparse_points(&windows_apps_path) {
+            Ok(reparse_points) => {
+                if reparse_points.is_empty() {
+                    println!("No reparse points found in Windows Apps directory");
+                } else {
+                    println!("Found {} reparse points:", reparse_points.len());
+                    println!("{:<30} {:<10} {:<30} {}", "Name", "Length", "Attributes", "FullName");
+                    println!("{}", "-".repeat(100));
+                    
+                    for rp in reparse_points {
+                        println!("{:<30} {:<10} {:<30} {}", 
+                            rp.name,
+                            rp.length,
+                            format_file_attributes(rp.attributes),
+                            rp.full_path.display()
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Error scanning Windows Apps directory: {}", e);
+            }
+        }
+    } else {
+        println!("Could not determine Windows Apps directory path");
     }
 }
