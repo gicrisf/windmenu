@@ -45,7 +45,7 @@ if (-not (Test-Path "assets\wlines-daemon.exe")) {
     }
     
     try {
-        $url = "https://github.com/gicrisf/wlines/releases/download/v0.0.1/wlines-daemon.exe"
+        $url = "https://github.com/gicrisf/wlines/releases/download/v0.1.0/wlines-daemon.exe"
         $output = "assets\wlines-daemon.exe"
         
         Write-Host "Downloading from: $url" -ForegroundColor Cyan
@@ -67,25 +67,14 @@ if (-not (Test-Path "assets\wlines-daemon.exe")) {
 
 # Create the installer
 Write-Host "Creating installer..." -ForegroundColor Yellow
-
-# Try the full installer first, fall back to simple version if there are plugin issues
-Write-Host "Attempting to build full installer (with PATH support)..." -ForegroundColor Cyan
 & makensis installer.nsi
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Full installer created successfully: windmenu-installer.exe" -ForegroundColor Green
+    Write-Host "Installer created successfully: windmenu-installer.exe" -ForegroundColor Green
 } else {
-    Write-Host "Full installer failed (likely due to missing NSIS plugins), creating simple version..." -ForegroundColor Yellow
-    & makensis installer-simple.nsi
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "Simple installer created successfully: windmenu-installer-simple.exe" -ForegroundColor Green
-        Write-Host "Note: This version doesn't modify PATH automatically" -ForegroundColor Yellow
-    } else {
-        Write-Host "Error: Both installers failed to build" -ForegroundColor Red
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
+    Write-Host "Error: installer failed to build" -ForegroundColor Red
+    Read-Host "Press Enter to exit"
+    exit 1 
 }
 
 Write-Host ""

@@ -128,7 +128,6 @@ Section Uninstall
   Delete "$INSTDIR\wlines-daemon.exe"
   Delete "$INSTDIR\config.toml"
   Delete "$INSTDIR\daemon-config.txt"
-  Delete "$INSTDIR\start-wlines-daemon.bat"
   Delete "$INSTDIR\uninstall.exe"
   
   ; Remove shortcuts
