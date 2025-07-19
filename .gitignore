@@ -24,3 +24,15 @@ target/
 # Added by cargo
 
 /target
+
+# Installer output
+windmenu-installer.exe
+
+# Downloaded assets
+assets/
+
+# Runtime files
+*.log
+
+# Executable in root
+*.exe
