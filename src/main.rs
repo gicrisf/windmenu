@@ -264,7 +264,7 @@ fn is_shortcut_pressed(shortcut_keys: &[String]) -> bool {
 }
 
 fn load_config() -> Option<Config> {
-    let config_path = PathBuf::from("config.toml");
+    let config_path = PathBuf::from("windmenu.toml");
     if !config_path.exists() {
         return None;
     }
