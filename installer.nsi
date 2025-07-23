@@ -11,6 +11,8 @@
 
 ; Modern UI
 !include "MUI2.nsh"
+!include "LogicLib.nsh"
+!include "x64.nsh"
 
 ; General settings
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
@@ -74,10 +76,12 @@ Section "Core Files (required)" SecCore
   File "assets\wlines-daemon.exe"
   
   ; Install configuration files
-  File "config.toml"
-  File "assets\daemon-config.txt"
-  File "assets\start-wlines-daemon.bat"
+  File "windmenu.toml"
+  File "assets\wlines-config.txt"
   
+  ; Bundle Visual C++ Redistributable (download from https://aka.ms/vs/17/release/vc_redist.x64.exe)
+  File "assets\vc_redist.x64.exe"
+
   ; Create uninstaller
   WriteUninstaller "$INSTDIR\uninstall.exe"
   
@@ -94,6 +98,7 @@ SectionEnd
 Section "Start Menu Shortcuts" SecStartMenu
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Windmenu Monitor.lnk" "$INSTDIR\windmenu-monitor.exe"
+  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Install VC++ Redistributable.lnk" "$INSTDIR\vc_redist.x64.exe"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe"
 SectionEnd
 
@@ -101,9 +106,98 @@ Section "Desktop Shortcut" SecDesktop
   CreateShortCut "$DESKTOP\Windmenu Monitor.lnk" "$INSTDIR\windmenu-monitor.exe"
 SectionEnd
 
-Section "Auto-start with Windows" SecAutoStart
+Section /o "Auto-start: Registry Run (Basic)" SecAutoStartRegistry
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" "$INSTDIR\windmenu.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WlinesDaemon" "$INSTDIR\start-wlines-daemon.bat"
+SectionEnd
+
+Section "Auto-start: Task Scheduler (Recommended)" SecAutoStartTask
+  ; Create task XML content with correct paths
+  FileOpen $0 "$INSTDIR\windmenu-task.xml" w
+  FileWrite $0 '<?xml version="1.0" encoding="UTF-16"?>$\r$\n'
+  FileWrite $0 '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">$\r$\n'
+  FileWrite $0 '  <RegistrationInfo>$\r$\n'
+  FileWrite $0 '    <Date>2025-07-11T00:00:00.0000000</Date>$\r$\n'
+  FileWrite $0 '    <Author>windmenu</Author>$\r$\n'
+  FileWrite $0 '    <Description>Automatically start windmenu application on user login</Description>$\r$\n'
+  FileWrite $0 '  </RegistrationInfo>$\r$\n'
+  FileWrite $0 '  <Triggers>$\r$\n'
+  FileWrite $0 '    <LogonTrigger>$\r$\n'
+  FileWrite $0 '      <Enabled>true</Enabled>$\r$\n'
+  FileWrite $0 '      <Delay>PT10S</Delay>$\r$\n'
+  FileWrite $0 '    </LogonTrigger>$\r$\n'
+  FileWrite $0 '  </Triggers>$\r$\n'
+  FileWrite $0 '  <Principals>$\r$\n'
+  FileWrite $0 '    <Principal id="Author">$\r$\n'
+  FileWrite $0 '      <LogonType>InteractiveToken</LogonType>$\r$\n'
+  FileWrite $0 '      <RunLevel>LeastPrivilege</RunLevel>$\r$\n'
+  FileWrite $0 '    </Principal>$\r$\n'
+  FileWrite $0 '  </Principals>$\r$\n'
+  FileWrite $0 '  <Settings>$\r$\n'
+  FileWrite $0 '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>$\r$\n'
+  FileWrite $0 '    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>$\r$\n'
+  FileWrite $0 '    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>$\r$\n'
+  FileWrite $0 '    <AllowHardTerminate>true</AllowHardTerminate>$\r$\n'
+  FileWrite $0 '    <StartWhenAvailable>true</StartWhenAvailable>$\r$\n'
+  FileWrite $0 '    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>$\r$\n'
+  FileWrite $0 '    <IdleSettings>$\r$\n'
+  FileWrite $0 '      <StopOnIdleEnd>false</StopOnIdleEnd>$\r$\n'
+  FileWrite $0 '      <RestartOnIdle>false</RestartOnIdle>$\r$\n'
+  FileWrite $0 '    </IdleSettings>$\r$\n'
+  FileWrite $0 '    <AllowStartOnDemand>true</AllowStartOnDemand>$\r$\n'
+  FileWrite $0 '    <Enabled>true</Enabled>$\r$\n'
+  FileWrite $0 '    <Hidden>false</Hidden>$\r$\n'
+  FileWrite $0 '    <RunOnlyIfIdle>false</RunOnlyIfIdle>$\r$\n'
+  FileWrite $0 '    <WakeToRun>false</WakeToRun>$\r$\n'
+  FileWrite $0 '    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>$\r$\n'
+  FileWrite $0 '    <Priority>7</Priority>$\r$\n'
+  FileWrite $0 '  </Settings>$\r$\n'
+  FileWrite $0 '  <Actions Context="Author">$\r$\n'
+  FileWrite $0 '    <Exec>$\r$\n'
+  FileWrite $0 '      <Command>$INSTDIR\windmenu.exe</Command>$\r$\n'
+  FileWrite $0 '      <WorkingDirectory>$INSTDIR</WorkingDirectory>$\r$\n'
+  FileWrite $0 '    </Exec>$\r$\n'
+  FileWrite $0 '    <Exec>$\r$\n'
+  FileWrite $0 '      <Command>$INSTDIR\wlines-daemon.exe</Command>$\r$\n'
+  FileWrite $0 '      <WorkingDirectory>$INSTDIR</WorkingDirectory>$\r$\n'
+  FileWrite $0 '    </Exec>$\r$\n'
+  FileWrite $0 '  </Actions>$\r$\n'
+  FileWrite $0 '</Task>$\r$\n'
+  FileClose $0
+  
+  ; Create the scheduled task
+  nsExec::ExecToLog 'schtasks /create /tn "windmenu" /xml "$INSTDIR\windmenu-task.xml" /f'
+  Pop $0
+  ${If} $0 != 0
+    DetailPrint "Warning: Failed to create scheduled task. You may need to run as administrator."
+  ${Else}
+    DetailPrint "Scheduled task created successfully"
+  ${EndIf}
+  
+  ; Clean up temporary XML file
+  Delete "$INSTDIR\windmenu-task.xml"
+SectionEnd
+
+Section /o "Auto-start: Current User Startup Folder" SecAutoStartUser
+  ; Create VBS script for silent startup
+  FileOpen $0 "$INSTDIR\start-windmenu.vbs" w
+  FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
+  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe""", 0, False$\r$\n'
+  FileClose $0
+  
+  ; Copy to user startup folder
+  CopyFiles "$INSTDIR\start-windmenu.vbs" "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\"
+SectionEnd
+
+Section /o "Auto-start: All Users Startup Folder" SecAutoStartAll
+  ; Create VBS script for silent startup
+  FileOpen $0 "$INSTDIR\start-windmenu.vbs" w
+  FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
+  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe""", 0, False$\r$\n'
+  FileClose $0
+  
+  ; Copy to all users startup folder (requires admin privileges)
+  CopyFiles "$INSTDIR\start-windmenu.vbs" "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\"
 SectionEnd
 
 ; Component descriptions
@@ -111,7 +205,10 @@ SectionEnd
   !insertmacro MUI_DESCRIPTION_TEXT ${SecCore} "Core Windmenu files (windmenu.exe, windmenu-monitor.exe, wlines-daemon.exe), configuration files, and startup scripts"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecStartMenu} "Create shortcuts in Start Menu"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecDesktop} "Create desktop shortcut for Windmenu Monitor"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStart} "Start Windmenu automatically when Windows starts"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartRegistry} "Start Windmenu automatically using Windows Registry (basic method, starts when current user logs in)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartTask} "Start Windmenu automatically using Task Scheduler (recommended - most reliable method)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartUser} "Start Windmenu automatically using current user's startup folder"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartAll} "Start Windmenu automatically using all users startup folder (affects all users on this computer)"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 ; Uninstaller section
@@ -119,15 +216,29 @@ Section Uninstall
   ; Remove registry keys
   DeleteRegKey ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}"
   DeleteRegKey HKCU "${PRODUCT_DIR_REGKEY}"
+  
+  ; Remove all possible startup methods
+  ; Registry Run method
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon"
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WlinesDaemon"
+  
+  ; Task Scheduler method
+  nsExec::ExecToLog 'schtasks /delete /tn "windmenu" /f'
+  Pop $0 ; ignore return value
+  
+  ; Startup folder methods
+  Delete "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\start-windmenu.vbs"
+  Delete "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\start-windmenu.vbs"
   
   ; Remove files and uninstaller
   Delete "$INSTDIR\windmenu.exe"
   Delete "$INSTDIR\windmenu-monitor.exe"
   Delete "$INSTDIR\wlines-daemon.exe"
-  Delete "$INSTDIR\config.toml"
-  Delete "$INSTDIR\daemon-config.txt"
+  Delete "$INSTDIR\windmenu.toml"
+  Delete "$INSTDIR\wlines-config.txt"
+  Delete "$INSTDIR\start-wlines-daemon.bat"
+  Delete "$INSTDIR\start-windmenu.vbs"
+  Delete "$INSTDIR\vc_redist.x64.exe"
   Delete "$INSTDIR\uninstall.exe"
   
   ; Remove shortcuts
@@ -150,6 +261,72 @@ Function .onInit
     MessageBox MB_OK|MB_ICONEXCLAMATION "Windmenu is currently running. Please close it before installing."
     Abort
   notRunning:
+  
+  ; Check for Visual C++ Redistributable
+  Call CheckVCRedist
+FunctionEnd
+
+; Function to check for Visual C++ Redistributable
+Function CheckVCRedist
+  ; Check for VC++ 2015-2022 Redistributable (x64)
+  ReadRegStr $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Version"
+  ${If} $0 == ""
+    ; Check alternative location
+    ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Version"
+  ${EndIf}
+  
+  ${If} $0 == ""
+    ; VC++ Redistributable not found
+    MessageBox MB_YESNO|MB_ICONQUESTION "Microsoft Visual C++ Redistributable 2015-2022 is required but not installed.$\n$\nThis is needed for Windmenu to run properly.$\n$\nWould you like to install it now?" IDYES install IDNO skip
+    
+    install:
+      DetailPrint "Installing Visual C++ Redistributable..."
+      ; Install bundled VC++ Redistributable
+      ExecWait '"$INSTDIR\vc_redist.x64.exe" /quiet /norestart' $0
+      ${If} $0 == 0
+        DetailPrint "Visual C++ Redistributable installed successfully"
+      ${ElseIf} $0 == 1638
+        DetailPrint "Visual C++ Redistributable: newer version already installed"
+      ${ElseIf} $0 == 3010
+        DetailPrint "Visual C++ Redistributable installed successfully (restart required)"
+        MessageBox MB_OK|MB_ICONINFORMATION "Visual C++ Redistributable installed successfully.$\n$\nA restart may be required for some features to work properly."
+      ${Else}
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Visual C++ Redistributable installation failed (code: $0).$\n$\nYou can try installing it manually by running:$\n$INSTDIR\vc_redist.x64.exe"
+      ${EndIf}
+      Goto end
+    
+    skip:
+      MessageBox MB_OK|MB_ICONINFORMATION "Important: You will need to install Microsoft Visual C++ Redistributable 2015-2022 before running Windmenu.$\n$\nYou can install it later by running: $INSTDIR\vc_redist.x64.exe"
+      Goto end
+  ${Else}
+    DetailPrint "Visual C++ Redistributable found: $0"
+  ${EndIf}
+  
+  end:
+FunctionEnd
+
+; Function to handle component selection changes
+Function .onSelChange
+  ; Count how many startup methods are selected
+  StrCpy $0 0
+  
+  ${If} ${SectionIsSelected} ${SecAutoStartRegistry}
+    IntOp $0 $0 + 1
+  ${EndIf}
+  ${If} ${SectionIsSelected} ${SecAutoStartTask}
+    IntOp $0 $0 + 1
+  ${EndIf}
+  ${If} ${SectionIsSelected} ${SecAutoStartUser}
+    IntOp $0 $0 + 1
+  ${EndIf}
+  ${If} ${SectionIsSelected} ${SecAutoStartAll}
+    IntOp $0 $0 + 1
+  ${EndIf}
+  
+  ; If more than one startup method is selected, show warning
+  ${If} $0 > 1
+    MessageBox MB_OK|MB_ICONINFORMATION "Warning: You have selected multiple startup methods. Only one should be selected to avoid conflicts. Please select only your preferred startup method."
+  ${EndIf}
 FunctionEnd
 
 Function un.onInit
