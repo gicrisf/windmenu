@@ -1,0 +1,14 @@
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+rustflags = [
+    "-C", "panic=abort",
+    "-C", "link-args=-static",
+    "-C", "link-args=-Wl,-Bstatic",
+    "-C", "link-args=-l:libmsvcrt.a",
+    "-C", "link-args=-l:libucrt.a",
+    "-C", "link-args=-l:libpthread.a",
+    "-C", "link-args=-l:libgcc.a",
+    "-C", "link-args=-nostartfiles",
+    "-C", "link-args=-Wl,--gc-sections",
+    "-C", "link-args=-Wl,--as-needed"
+]
