@@ -64,6 +64,7 @@ VIAddVersionKey "FileDescription" "${PRODUCT_NAME} Installer"
 VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
 
 ; Installation sections
+SectionGroup "Windmenu Core" SecGrpCore
 Section "Core Files (required)" SecCore
   SectionIn RO
   
@@ -94,7 +95,9 @@ Section "Core Files (required)" SecCore
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_WEB_SITE}"
   WriteRegStr ${PRODUCT_UNINST_ROOT_KEY} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
 SectionEnd
+SectionGroupEnd
 
+SectionGroup "Shortcuts" SecGrpShortcuts
 Section "Start Menu Shortcuts" SecStartMenu
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Windmenu Monitor.lnk" "$INSTDIR\windmenu-monitor.exe"
@@ -105,13 +108,15 @@ SectionEnd
 Section "Desktop Shortcut" SecDesktop
   CreateShortCut "$DESKTOP\Windmenu Monitor.lnk" "$INSTDIR\windmenu-monitor.exe"
 SectionEnd
+SectionGroupEnd
 
-Section /o "Auto-start: Registry Run (Basic)" SecAutoStartRegistry
+SectionGroup /e "Auto-start Options" SecGrpAutoStart
+Section /o "Registry Run (Basic)" SecAutoStartRegistry
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" "$INSTDIR\windmenu.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WlinesDaemon" "$INSTDIR\start-wlines-daemon.bat"
 SectionEnd
 
-Section /o "Auto-start: Task Scheduler (Admin)" SecAutoStartTask
+Section /o "Task Scheduler (Admin)" SecAutoStartTask
   ; Check current privileges
   UserInfo::GetAccountType
   Pop $0
@@ -192,7 +197,7 @@ Section /o "Auto-start: Task Scheduler (Admin)" SecAutoStartTask
   Delete "$INSTDIR\windmenu-task.xml"
 SectionEnd
 
-Section /o "Auto-start: Current User Startup Folder" SecAutoStartUser
+Section /o "Current User Startup Folder" SecAutoStartUser
   ; Create VBS script for silent startup
   FileOpen $0 "$INSTDIR\start-windmenu-user.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
@@ -203,7 +208,7 @@ Section /o "Auto-start: Current User Startup Folder" SecAutoStartUser
   CopyFiles "$INSTDIR\start-windmenu-user.vbs" "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\"
 SectionEnd
 
-Section /o "Auto-start: All Users Startup Folder" SecAutoStartAll
+Section /o "All Users Startup Folder" SecAutoStartAll
   ; Create VBS script for silent startup
   FileOpen $0 "$INSTDIR\start-windmenu-all.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
@@ -213,6 +218,7 @@ Section /o "Auto-start: All Users Startup Folder" SecAutoStartAll
   ; Copy to all users startup folder (requires admin privileges)
   CopyFiles "$INSTDIR\start-windmenu-all.vbs" "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\"
 SectionEnd
+SectionGroupEnd
 
 ; Component descriptions
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
@@ -269,23 +275,20 @@ SectionEnd
 
 ; Function to check if application is running
 Function .onInit
-  ; Check if windmenu processes are running
-  nsExec::ExecToLog 'tasklist /FI "IMAGENAME eq windmenu.exe" /FO CSV'
-  Pop $0
-  ${If} $0 == 0
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Windmenu is currently running. Please close it before installing."
+  MessageBox MB_YESNO|MB_ICONQUESTION \
+    "Installer will close any running Windmenu processes to continue. Continue?" \
+    IDYES close_processes IDNO abort_install
+    
+  close_processes:
+    nsExec::ExecToLog 'taskkill /F /IM windmenu.exe /IM windmenu-monitor.exe'
+    ; Ignore return code - processes may not be running
+    Goto check_vc
+    
+  abort_install:
     Abort
-  ${EndIf}
-  
-  nsExec::ExecToLog 'tasklist /FI "IMAGENAME eq windmenu-monitor.exe" /FO CSV'
-  Pop $0
-  ${If} $0 == 0
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Windmenu Monitor is currently running. Please close it before installing."
-    Abort
-  ${EndIf}
-  
-  ; Check for VC++ Redistributable
-  Call CheckVCRedist
+    
+  check_vc:
+    Call CheckVCRedist
 FunctionEnd
 
 ; Function to check for Visual C++ Redistributable
