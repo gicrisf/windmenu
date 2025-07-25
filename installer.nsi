@@ -113,7 +113,7 @@ SectionGroupEnd
 SectionGroup /e "Auto-start Options" SecGrpAutoStart
 Section /o "Registry Run (Basic)" SecAutoStartRegistry
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" "$INSTDIR\windmenu.exe"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WlinesDaemon" "$INSTDIR\start-wlines-daemon.bat"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WlinesDaemon" "$INSTDIR\wlines-daemon.exe"
 SectionEnd
 
 Section /o "Task Scheduler (Admin)" SecAutoStartTask
@@ -256,7 +256,6 @@ Section Uninstall
   Delete "$INSTDIR\wlines-daemon.exe"
   Delete "$INSTDIR\windmenu.toml"
   Delete "$INSTDIR\wlines-config.txt"
-  Delete "$INSTDIR\start-wlines-daemon.bat"
   Delete "$INSTDIR\start-windmenu-user.vbs"
   Delete "$INSTDIR\start-windmenu-all.vbs"
   Delete "$INSTDIR\vc_redist.x64.exe"
