@@ -269,15 +269,22 @@ SectionEnd
 
 ; Function to check if application is running
 Function .onInit
-  ; Check if windmenu or windmenu-monitor is running
-  System::Call 'kernel32::OpenMutex(i 0x100000, b 0, t "WindmenuMutex") i .R0'
-  IntCmp $R0 0 notRunning
-    System::Call 'kernel32::CloseHandle(i $R0)'
+  ; Check if windmenu processes are running
+  nsExec::ExecToLog 'tasklist /FI "IMAGENAME eq windmenu.exe" /FO CSV'
+  Pop $0
+  ${If} $0 == 0
     MessageBox MB_OK|MB_ICONEXCLAMATION "Windmenu is currently running. Please close it before installing."
     Abort
-  notRunning:
+  ${EndIf}
   
-  ; Check for Visual C++ Redistributable
+  nsExec::ExecToLog 'tasklist /FI "IMAGENAME eq windmenu-monitor.exe" /FO CSV'
+  Pop $0
+  ${If} $0 == 0
+    MessageBox MB_OK|MB_ICONEXCLAMATION "Windmenu Monitor is currently running. Please close it before installing."
+    Abort
+  ${EndIf}
+  
+  ; Check for VC++ Redistributable
   Call CheckVCRedist
 FunctionEnd
 
