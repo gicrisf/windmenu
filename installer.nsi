@@ -111,7 +111,21 @@ Section /o "Auto-start: Registry Run (Basic)" SecAutoStartRegistry
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WlinesDaemon" "$INSTDIR\start-wlines-daemon.bat"
 SectionEnd
 
-Section "Auto-start: Task Scheduler (Recommended)" SecAutoStartTask
+Section /o "Auto-start: Task Scheduler (Admin)" SecAutoStartTask
+  ; Check current privileges
+  UserInfo::GetAccountType
+  Pop $0
+  ${If} $0 != "Admin"
+    MessageBox MB_YESNO|MB_ICONEXCLAMATION \
+      "Task Scheduler requires administrator privileges. $\n$\nWould you like to restart the installer as administrator?" \
+      IDYES run_as_admin IDNO skip_task
+    run_as_admin:
+      ExecShell "runas" "$EXEPATH" ""
+      Quit
+    skip_task:
+      SectionSetFlags ${SecAutoStartTask} 0  ; Deselect section
+      Return
+  ${EndIf}
   ; Create task XML content with correct paths
   FileOpen $0 "$INSTDIR\windmenu-task.xml" w
   FileWrite $0 '<?xml version="1.0" encoding="UTF-16"?>$\r$\n'
@@ -206,7 +220,7 @@ SectionEnd
   !insertmacro MUI_DESCRIPTION_TEXT ${SecStartMenu} "Create shortcuts in Start Menu"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecDesktop} "Create desktop shortcut for Windmenu Monitor"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartRegistry} "Start Windmenu automatically using Windows Registry (basic method, starts when current user logs in)"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartTask} "Start Windmenu automatically using Task Scheduler (recommended - most reliable method)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartTask} "Start Windmenu automatically using Task Scheduler (recommended - most reliable, but needs admin privileges)"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartUser} "Start Windmenu automatically using current user's startup folder"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartAll} "Start Windmenu automatically using all users startup folder (affects all users on this computer)"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
