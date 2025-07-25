@@ -1,6 +1,8 @@
 # windmenu
 Fast like the wind, a WINdows DMENU-like launcher
 
+https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
+
 ## Features
 
 - Fast application launcher via hotkey (Win+Space is default)
@@ -80,11 +82,17 @@ This directory contains the NSIS installer script and build tools for creating a
 
 The build process is fully automated and handles all dependencies:
 
+**On Windows (PowerShell):**
 ```powershell
 .\build-installer.ps1
 ```
 
-This script will:
+**On Linux/WSL (Bash):**
+```bash
+./build-installer.sh
+```
+
+Both scripts will:
 1. **Build Rust projects** using `cargo build --release`
 2. **Download dependencies automatically** if missing:
    - `wlines-daemon.exe` from [wlines releases](https://github.com/gicrisf/wlines/releases/)
