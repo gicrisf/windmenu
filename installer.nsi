@@ -194,24 +194,24 @@ SectionEnd
 
 Section /o "Auto-start: Current User Startup Folder" SecAutoStartUser
   ; Create VBS script for silent startup
-  FileOpen $0 "$INSTDIR\start-windmenu.vbs" w
+  FileOpen $0 "$INSTDIR\start-windmenu-user.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
   FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe""", 0, False$\r$\n'
   FileClose $0
   
   ; Copy to user startup folder
-  CopyFiles "$INSTDIR\start-windmenu.vbs" "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\"
+  CopyFiles "$INSTDIR\start-windmenu-user.vbs" "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\"
 SectionEnd
 
 Section /o "Auto-start: All Users Startup Folder" SecAutoStartAll
   ; Create VBS script for silent startup
-  FileOpen $0 "$INSTDIR\start-windmenu.vbs" w
+  FileOpen $0 "$INSTDIR\start-windmenu-all.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
   FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe""", 0, False$\r$\n'
   FileClose $0
   
   ; Copy to all users startup folder (requires admin privileges)
-  CopyFiles "$INSTDIR\start-windmenu.vbs" "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\"
+  CopyFiles "$INSTDIR\start-windmenu-all.vbs" "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\"
 SectionEnd
 
 ; Component descriptions
@@ -251,7 +251,8 @@ Section Uninstall
   Delete "$INSTDIR\windmenu.toml"
   Delete "$INSTDIR\wlines-config.txt"
   Delete "$INSTDIR\start-wlines-daemon.bat"
-  Delete "$INSTDIR\start-windmenu.vbs"
+  Delete "$INSTDIR\start-windmenu-user.vbs"
+  Delete "$INSTDIR\start-windmenu-all.vbs"
   Delete "$INSTDIR\vc_redist.x64.exe"
   Delete "$INSTDIR\uninstall.exe"
   
