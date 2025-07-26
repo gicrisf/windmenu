@@ -1,0 +1,93 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-gnu
+    
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-mingw-w64-x86-64 nsis curl jq unzip
+    
+    - name: Cache cargo dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Verify wlines-daemon.exe exists
+      run: |
+        if [ ! -f "assets/wlines-daemon.exe" ]; then
+          echo "ERROR: wlines-daemon.exe not found in assets directory!"
+          echo "WindMenu requires wlines-daemon.exe to function properly."
+          exit 1
+        fi
+        echo "✓ wlines-daemon.exe found"
+    
+    - name: Make build script executable
+      run: chmod +x build-installer.sh
+    
+    - name: Run build installer script
+      run: ./build-installer.sh
+    
+    - name: Verify build outputs
+      run: |
+        if [ ! -f "windmenu-installer.exe" ]; then
+          echo "ERROR: windmenu-installer.exe was not created!"
+          exit 1
+        fi
+        
+        if [ ! -f "target/x86_64-pc-windows-gnu/release/windmenu.exe" ]; then
+          echo "ERROR: windmenu.exe was not built!"
+          exit 1
+        fi
+        
+        if [ ! -f "target/x86_64-pc-windows-gnu/release/windmenu-monitor.exe" ]; then
+          echo "ERROR: windmenu-monitor.exe was not built!"
+          exit 1
+        fi
+        
+        echo "✓ All build outputs verified"
+    
+    - name: Create portable ZIP archive
+      run: |
+        mkdir -p release-portable
+        cp target/x86_64-pc-windows-gnu/release/windmenu.exe release-portable/
+        cp target/x86_64-pc-windows-gnu/release/windmenu-monitor.exe release-portable/
+        cp assets/wlines-daemon.exe release-portable/
+        cp windmenu.toml release-portable/
+        cp README.md release-portable/
+        cp LICENSE release-portable/
+        
+        cd release-portable
+        zip -r ../windmenu-portable.zip .
+        cd ..
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: windmenu-build-${{ github.sha }}
+        path: |
+          windmenu-installer.exe
+          windmenu-portable.zip
+        retention-days: 30

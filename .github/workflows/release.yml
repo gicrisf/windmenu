@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+        default: 'v0.1.0'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Get tag name and commit SHA
+      id: tag_info
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          # For manual dispatch, use current commit
+          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+        else
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          # For tag push, use the commit that was tagged
+          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Download build artifacts from tagged commit
+      uses: dawidd6/action-download-artifact@v2
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        workflow: build.yml
+        commit: ${{ steps.tag_info.outputs.sha }}
+        name: windmenu-build-${{ steps.tag_info.outputs.sha }}
+        path: ./artifacts
+    
+    - name: Extract artifacts
+      run: |
+        # Move artifacts to current directory
+        mv ./artifacts/* ./
+        
+        # Verify artifacts exist
+        if [ ! -f "windmenu-installer.exe" ] || [ ! -f "windmenu-portable.zip" ]; then
+          echo "ERROR: Required artifacts not found!"
+          echo "Make sure the build workflow ran successfully for commit ${{ steps.tag_info.outputs.sha }}"
+          echo "Files found:"
+          ls -la
+          exit 1
+        fi
+        
+        echo "✓ Artifacts ready for release"
+    
+    - name: Prepare Release Notes
+      run: |
+        # Use RELEASE_NOTES.md if it exists, otherwise fall back to a template  
+        if [ -f "RELEASE_NOTES.md" ]; then  
+          echo "✓ Using RELEASE_NOTES.md from commit ${{ steps.tag_info.outputs.sha }}"  
+          cp RELEASE_NOTES.md release_notes.md  
+        else  
+          echo "⚠️ No RELEASE_NOTES.md found - using default template"  
+          cat > release_notes.md << 'EOF'  
+          ## WindMenu ${{ steps.tag_info.outputs.tag }}  
+          (Default release notes here...)  
+          EOF  
+        fi
+        echo "Release notes prepared at release_notes.md"
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag_info.outputs.tag }}
+        name: WindMenu ${{ steps.tag_info.outputs.tag }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: ${{ contains(steps.tag_info.outputs.tag, '-') }}
+        files: |
+          windmenu-installer.exe
+          windmenu-portable.zip
+        token: ${{ secrets.GITHUB_TOKEN }}
