@@ -93,20 +93,18 @@ The build process is fully automated and handles all dependencies:
 ```
 
 Both scripts will:
-1. **Build Rust projects** using `cargo build --release`
+1. **Build Rust projects**
 2. **Download dependencies automatically** if missing:
    - `wlines-daemon.exe` from [wlines releases](https://github.com/gicrisf/wlines/releases/)
-   - `vc_redist.x64.exe` (Visual C++ Redistributable 2015-2022) from Microsoft
 3. **Create the NSIS installer** with all components bundled
 
 ### Bundled Dependencies
 
 The installer is completely self-contained and includes:
 - `windmenu.exe` - Main windmenu daemon
-- `windmenu-monitor.exe` - GUI monitor application  
+- `windmenu-monitor.exe` - GUI monitor application
 - `wlines-daemon.exe` - External wlines daemon dependency
 - `windmenu.toml` - Default configuration file
-- `vc_redist.x64.exe` - Visual C++ Redistributable (ensures compatibility)
 
 ### Installation Options
 
@@ -116,7 +114,6 @@ The installer provides several installation components:
 1. **Core Files (required)**: Main binaries, configuration, and dependencies
 2. **Start Menu Shortcuts**: Creates shortcuts in the Start Menu, including:
    - Windmenu Monitor (primary interface for status checking and daemon management)
-   - Install VC++ Redistributable (manual installation option)
    - Uninstall
 3. **Desktop Shortcut**: Creates a desktop shortcut for Windmenu Monitor
 4. **Auto-startup Options**
@@ -131,8 +128,8 @@ Choose **one** of the following startup methods:
 
 ### Dependency Management
 
-#### Visual C++ Redistributable
-The installer automatically detects if Visual C++ Redistributable 2015-2022 is installed. **If missing**, offers to install it automatically using the bundled redistributable.
+#### Runtime Dependencies
+WindMenu uses static linking to minimize external dependencies. No additional runtime libraries are required on modern Windows 10/11 systems.
 
 ### Default Installation Location
 
@@ -148,7 +145,6 @@ After installation, the following structure will be created:
 ├── windmenu-monitor.exe  
 ├── wlines-daemon.exe
 ├── windmenu.toml
-├── vc_redist.x64.exe
 └── uninstall.exe
 ```
 
