@@ -272,17 +272,12 @@ Function .onInit
   MessageBox MB_YESNO|MB_ICONQUESTION \
     "Installer will close any running Windmenu processes to continue. Continue?" \
     IDYES close_processes IDNO abort_install
-    
-  close_processes:
-    nsExec::ExecToLog 'taskkill /F /IM windmenu.exe /IM windmenu-monitor.exe'
-    ; Ignore return code - processes may not be running
-    Goto check_vc
-    
+
   abort_install:
     Abort
     
-  check_vc:
-    Call CheckVCRedist
+  close_processes:
+    nsExec::ExecToLog 'taskkill /F /IM windmenu.exe /IM windmenu-monitor.exe' 
 FunctionEnd
 
 ; Function to handle component selection changes
