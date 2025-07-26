@@ -17,6 +17,7 @@ RUSTFLAGS="-C target-feature=+crt-static" \
     cargo build --release --target x86_64-pc-windows-gnu --target-dir ./target
 
 # Help NSIS
+mkdir -p target/release
 ln -sf "$(pwd)/target/x86_64-pc-windows-gnu/release/windmenu.exe" "target/release/"
 ln -sf "$(pwd)/target/x86_64-pc-windows-gnu/release/windmenu-monitor.exe" "target/release/"
 
@@ -67,43 +68,6 @@ if [ ! -f "assets/wlines-daemon.exe" ]; then
         echo -e "\033[0;31mError: Failed to download wlines-daemon.exe\033[0m"
         echo -e "\033[0;33mPlease download it manually from: $url\033[0m"
         echo -e "\033[0;33mand place it in the assets/ directory\033[0m"
-        exit 1
-    fi
-fi
-
-# Check for Visual C++ Redistributable
-if [ ! -f "assets/vc_redist.x64.exe" ]; then
-    echo -e "\033[0;33mvc_redist.x64.exe not found in assets/, downloading...\033[0m"
-    
-    # Create assets directory if it doesn't exist
-    if [ ! -d "assets" ]; then
-        mkdir -p assets
-        echo -e "\033[0;32mCreated assets/ directory\033[0m"
-    fi
-    
-    vcRedistUrl="https://aka.ms/vs/17/release/vc_redist.x64.exe"
-    vcRedistPath="assets/vc_redist.x64.exe"
-    
-    echo -e "\033[0;36mDownloading Visual C++ Redistributable 2015-2022 (x64)...\033[0m"
-    echo -e "\033[0;36mFrom: $vcRedistUrl\033[0m"
-    
-    if command -v wget &> /dev/null; then
-        wget -O "$vcRedistPath" "$vcRedistUrl"
-    elif command -v curl &> /dev/null; then
-        curl -L -o "$vcRedistPath" "$vcRedistUrl"
-    else
-        echo -e "\033[0;31mError: Neither wget nor curl found. Please install one of them.\033[0m"
-        exit 1
-    fi
-    
-    if [ -f "$vcRedistPath" ]; then
-        echo -e "\033[0;32mSuccessfully downloaded vc_redist.x64.exe\033[0m"
-        fileSize=$(du -m "$vcRedistPath" | cut -f1)
-        echo -e "\033[0;36mFile size: ${fileSize} MB\033[0m"
-    else
-        echo -e "\033[0;31mError: Failed to download VC++ Redistributable\033[0m"
-        echo -e "\033[0;33mPlease download it manually from: $vcRedistUrl\033[0m"
-        echo -e "\033[0;33mand save it as: assets/vc_redist.x64.exe\033[0m"
         exit 1
     fi
 fi

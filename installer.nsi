@@ -80,9 +80,6 @@ Section "Core Files (required)" SecCore
   File "windmenu.toml"
   File "assets\wlines-config.txt"
   
-  ; Bundle Visual C++ Redistributable (download from https://aka.ms/vs/17/release/vc_redist.x64.exe)
-  File "assets\vc_redist.x64.exe"
-
   ; Create uninstaller
   WriteUninstaller "$INSTDIR\uninstall.exe"
   
@@ -101,7 +98,6 @@ SectionGroup "Shortcuts" SecGrpShortcuts
 Section "Start Menu Shortcuts" SecStartMenu
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Windmenu Monitor.lnk" "$INSTDIR\windmenu-monitor.exe"
-  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Install VC++ Redistributable.lnk" "$INSTDIR\vc_redist.x64.exe"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe"
 SectionEnd
 
@@ -258,7 +254,6 @@ Section Uninstall
   Delete "$INSTDIR\wlines-config.txt"
   Delete "$INSTDIR\start-windmenu-user.vbs"
   Delete "$INSTDIR\start-windmenu-all.vbs"
-  Delete "$INSTDIR\vc_redist.x64.exe"
   Delete "$INSTDIR\uninstall.exe"
   
   ; Remove shortcuts
@@ -288,45 +283,6 @@ Function .onInit
     
   check_vc:
     Call CheckVCRedist
-FunctionEnd
-
-; Function to check for Visual C++ Redistributable
-Function CheckVCRedist
-  ; Check for VC++ 2015-2022 Redistributable (x64)
-  ReadRegStr $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Version"
-  ${If} $0 == ""
-    ; Check alternative location
-    ReadRegStr $0 HKLM "SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Version"
-  ${EndIf}
-  
-  ${If} $0 == ""
-    ; VC++ Redistributable not found
-    MessageBox MB_YESNO|MB_ICONQUESTION "Microsoft Visual C++ Redistributable 2015-2022 is required but not installed.$\n$\nThis is needed for Windmenu to run properly.$\n$\nWould you like to install it now?" IDYES install IDNO skip
-    
-    install:
-      DetailPrint "Installing Visual C++ Redistributable..."
-      ; Install bundled VC++ Redistributable
-      ExecWait '"$INSTDIR\vc_redist.x64.exe" /quiet /norestart' $0
-      ${If} $0 == 0
-        DetailPrint "Visual C++ Redistributable installed successfully"
-      ${ElseIf} $0 == 1638
-        DetailPrint "Visual C++ Redistributable: newer version already installed"
-      ${ElseIf} $0 == 3010
-        DetailPrint "Visual C++ Redistributable installed successfully (restart required)"
-        MessageBox MB_OK|MB_ICONINFORMATION "Visual C++ Redistributable installed successfully.$\n$\nA restart may be required for some features to work properly."
-      ${Else}
-        MessageBox MB_OK|MB_ICONEXCLAMATION "Visual C++ Redistributable installation failed (code: $0).$\n$\nYou can try installing it manually by running:$\n$INSTDIR\vc_redist.x64.exe"
-      ${EndIf}
-      Goto end
-    
-    skip:
-      MessageBox MB_OK|MB_ICONINFORMATION "Important: You will need to install Microsoft Visual C++ Redistributable 2015-2022 before running Windmenu.$\n$\nYou can install it later by running: $INSTDIR\vc_redist.x64.exe"
-      Goto end
-  ${Else}
-    DetailPrint "Visual C++ Redistributable found: $0"
-  ${EndIf}
-  
-  end:
 FunctionEnd
 
 ; Function to handle component selection changes

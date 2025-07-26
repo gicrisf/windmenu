@@ -65,39 +65,6 @@ if (-not (Test-Path "assets\wlines-daemon.exe")) {
     }
 }
 
-# Check for Visual C++ Redistributable
-if (-not (Test-Path "assets\vc_redist.x64.exe")) {
-    Write-Host "vc_redist.x64.exe not found in assets\, downloading..." -ForegroundColor Yellow
-    
-    # Create assets directory if it doesn't exist
-    if (-not (Test-Path "assets")) {
-        New-Item -ItemType Directory -Path "assets" | Out-Null
-        Write-Host "Created assets\ directory" -ForegroundColor Green
-    }
-    
-    try {
-        $vcRedistUrl = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
-        $vcRedistPath = "assets\vc_redist.x64.exe"
-        
-        Write-Host "Downloading Visual C++ Redistributable 2015-2022 (x64)..." -ForegroundColor Cyan
-        Write-Host "From: $vcRedistUrl" -ForegroundColor Cyan
-        Invoke-WebRequest -Uri $vcRedistUrl -OutFile $vcRedistPath -UseBasicParsing
-        
-        if (Test-Path $vcRedistPath) {
-            Write-Host "Successfully downloaded vc_redist.x64.exe" -ForegroundColor Green
-            Write-Host "File size: $([math]::Round((Get-Item $vcRedistPath).Length / 1MB, 2)) MB" -ForegroundColor Cyan
-        } else {
-            throw "Download completed but file not found"
-        }
-    } catch {
-        Write-Host "Error: Failed to download VC++ Redistributable" -ForegroundColor Red
-        Write-Host "Please download it manually from: $vcRedistUrl" -ForegroundColor Yellow
-        Write-Host "and save it as: assets\vc_redist.x64.exe" -ForegroundColor Yellow
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
-}
-
 # Create the installer
 Write-Host "Creating installer..." -ForegroundColor Yellow
 & makensis installer.nsi
