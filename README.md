@@ -6,6 +6,7 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 ## Features
 
 - Fast application launcher via hotkey (Win+Space is default)
+- Vim-like navigation (hjkl) alongside arrow keys
 - Scans Windows Start Menu shortcuts automatically
 - Supports custom commands via configuration
 - Key combination commands - trigger keyboard shortcuts from the menu
@@ -75,8 +76,8 @@ This directory contains the NSIS installer script and build tools for creating a
 
 ### Prerequisites
 
-1. **NSIS (Nullsoft Scriptable Install System)**: Download and install from [https://nsis.sourceforge.io/](https://nsis.sourceforge.io/) (I actually use `scoop install nsis`)
-2. **Rust toolchain**: Required to build the windmenu binaries
+1. NSIS (Nullsoft Scriptable Install System)
+2. Rust toolchain
 
 ### Building the Installer
 
@@ -104,7 +105,6 @@ The installer is completely self-contained and includes:
 - `windmenu.exe` - Main windmenu daemon
 - `windmenu-monitor.exe` - GUI monitor application
 - `wlines-daemon.exe` - External wlines daemon dependency
-- `windmenu.toml` - Default configuration file
 
 ### Installation Options
 
@@ -121,15 +121,15 @@ The installer provides several installation components:
 #### Auto-startup Options
 Choose **one** of the following startup methods:
 
-1. **Registry Run (Basic)** - Default selection
-2. **Task Scheduler (Most reliable)**
-3. **Current User Startup Folder (Easier)**
-4. **All Users Startup Folder** (affects all users and requires permissions)
+1. Registry Run (Suggested)
+2. Task Scheduler
+3. Current User Startup Folder
+4. All Users Startup Folder (affects all users and requires permissions)
 
 ### Dependency Management
 
 #### Runtime Dependencies
-WindMenu uses static linking to minimize external dependencies. No additional runtime libraries are required on modern Windows 10/11 systems.
+WindMenu uses static linking to minimize external dependencies. No additional runtime libraries are required on modern Windows 10/11 systems. (Should theoretically work on any Windows version from XP onward, though it has only been tested on Windows 10/11)
 
 ### Default Installation Location
 
@@ -142,9 +142,8 @@ After installation, the following structure will be created:
 ```
 %LOCALAPPDATA%\windmenu\
 ├── windmenu.exe
-├── windmenu-monitor.exe  
+├── windmenu-monitor.exe
 ├── wlines-daemon.exe
-├── windmenu.toml
 └── uninstall.exe
 ```
 
@@ -152,7 +151,7 @@ After installation, the following structure will be created:
 
 The installer creates an uninstaller that:
 - Removes all installed files and created directories
-- Cleans up all startup methods (Registry, Task Scheduler, Startup folders)  
+- Cleans up all startup methods (Registry, Task Scheduler, Startup folders)
 - Removes all shortcuts and registry entries
 - Can be accessed through:
   - Control Panel → Programs and Features
@@ -161,6 +160,9 @@ The installer creates an uninstaller that:
 
 The uninstaller ensures complete removal regardless of which startup method was selected during installation.
 
+For manual verification, check the installation directory (typically `%LOCALAPPDATA%\windmenu\` or your custom location). The application is portable, so all binaries and configurations reside within this directory. Simply deleting it will remove all traces from your system, as no other files are stored elsewhere. 
+
+> N.B. The uninstaller removes only installed files, keeping any manually edited configs. These remain for future reinstalls. Delete them manually if needed.
 
 ## Key Combination Commands
 
