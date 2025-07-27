@@ -53,98 +53,98 @@ args = ["wt"]
 ## Key combinations
 # Tabs
 [[commands]]
-name = "wt next tab (key combo)"
+name = "wt next tab"
 keys = ["CTRL", "ALT", "RIGHT"]
 
 [[commands]]
-name = "wt prev tab (key combo)"
+name = "wt prev tab"
 keys = ["CTRL", "ALT", "LEFT"]
 
 [[commands]]
-name = "wt settings (key combo)"
+name = "wt settings"
 keys = ["CTRL", "COMMA"]
 
 [[commands]]
-name = "wt new tab (key combo)"
+name = "wt new tab"
 keys = ["CTRL", "SHIFT", "T"]
 
 # Font size
 [[commands]]
-name = "wt decrease font size (key combo)"
+name = "wt decrease font size"
 keys = ["CTRL", "-"]
 
 [[commands]]
-name = "wt increase font size (key combo)"
+name = "wt increase font size"
 keys = ["CTRL", "+"]
 
 [[commands]]
-name = "wt reset font size (key combo)"
+name = "wt reset font size"
 keys = ["CTRL", "0"]
 
 # Panes
 [[commands]]
-name = "wt duplicate pane (key combo)"
+name = "wt duplicate pane"
 keys = ["ALT", "SHIFT", "D"]
 
 [[commands]]
-name = "wt duplicate pane and split down (key combo)"
+name = "wt duplicate pane and split down"
 keys = ["ALT", "SHIFT", "-"]
 
 [[commands]]
-name = "wt duplicate pane and split right (key combo)"
+name = "wt duplicate pane and split right"
 keys = ["ALT", "SHIFT", "+"]
 
 [[commands]]
-name = "wt close pane (key combo)"
+name = "wt close pane"
 keys = ["CTRL", "SHIFT", "W"]
 
 [[commands]]
-name = "wt focus up (key combo)"
+name = "wt focus up"
 keys = ["ALT", "UP"]
 
 [[commands]]
-name = "wt focus down (key combo)"
+name = "wt focus down"
 keys = ["ALT", "DOWN"]
 
 [[commands]]
-name = "wt focus left (key combo)"
+name = "wt focus left"
 keys = ["ALT", "LEFT"]
 
 [[commands]]
-name = "wt focus right (key combo)"
+name = "wt focus right"
 keys = ["ALT", "RIGHT"]
 
 [[commands]]
-name = "wt resize pane up (key combo)"
+name = "wt resize pane up"
 keys = ["ALT", "SHIFT", "UP"]
 
 [[commands]]
-name = "wt resize pane down (key combo)"
+name = "wt resize pane down"
 keys = ["ALT", "SHIFT", "DOWN"]
 
 [[commands]]
-name = "wt resize pane left (key combo)"
+name = "wt resize pane left"
 keys = ["ALT", "SHIFT", "LEFT"]
 
 [[commands]]
-name = "wt resize pane right (key combo)"
+name = "wt resize pane right"
 keys = ["ALT", "SHIFT", "RIGHT"]
 
 # other stuff
 [[commands]]
-name = "wt key combo find"
+name = "wt find"
 keys = ["CTRL", "SHIFT", "F"]
 
 [[commands]]
-name = "wt key combo new window"
+name = "wt new window"
 keys = ["CTRL", "SHIFT", "N"]
 
 [[commands]]
-name = "wt key combo toggle mark mode"
+name = "wt toggle mark mode"
 keys = ["CTRL", "SHIFT", "M"]
 
 [[commands]]
-name = "maximize key combo"
+name = "maximize"
 keys = ["WIN", "UP"]
 
 # System power commands

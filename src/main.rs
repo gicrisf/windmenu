@@ -309,11 +309,15 @@ fn initialize_app_state() -> AppState {
     
     if let Some(config) = config {
         for cmd in config.commands {
-            let command = match cmd.command_type {
-                CommandType::Args { args } => AppCommand::Configured(args),
-                CommandType::Keys { keys } => AppCommand::KeyCombo(keys),
+            let (key, command) = match cmd.command_type {
+                CommandType::Args { args } => (cmd.name, AppCommand::Configured(args)),
+                CommandType::Keys { keys } => {
+                    let key_sequence = keys.join(", ");
+                    let formatted_key = format!("{} [{}]", cmd.name, key_sequence);
+                    (formatted_key, AppCommand::KeyCombo(keys))
+                }
             };
-            commands.insert(cmd.name, command);
+            commands.insert(key, command);
         }
     }
 
