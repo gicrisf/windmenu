@@ -121,9 +121,9 @@ jobs:
         else
           echo "⚠️ No RELEASE_NOTES.md found - using default template"
           cat > release_notes.md << 'EOF'
-## WindMenu ${{ steps.tag_info.outputs.tag }}
-(Default release notes here...)
-EOF
+          ## WindMenu ${{ steps.tag_info.outputs.tag }}
+          (Default release notes here...)
+          EOF
         fi
     
     - name: Create GitHub Release
