@@ -75,11 +75,7 @@ Section "Core Files (required)" SecCore
   File "target\release\windmenu.exe"
   File "target\release\windmenu-monitor.exe"
   File "assets\wlines-daemon.exe"
-  
-  ; Install configuration files
-  File "windmenu.toml"
-  File "assets\wlines-config.txt"
-  
+   
   ; Create uninstaller
   WriteUninstaller "$INSTDIR\uninstall.exe"
   
@@ -250,8 +246,6 @@ Section Uninstall
   Delete "$INSTDIR\windmenu.exe"
   Delete "$INSTDIR\windmenu-monitor.exe"
   Delete "$INSTDIR\wlines-daemon.exe"
-  Delete "$INSTDIR\windmenu.toml"
-  Delete "$INSTDIR\wlines-config.txt"
   Delete "$INSTDIR\start-windmenu-user.vbs"
   Delete "$INSTDIR\start-windmenu-all.vbs"
   Delete "$INSTDIR\uninstall.exe"
