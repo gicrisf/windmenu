@@ -339,7 +339,9 @@ fn execute_wlines(state: Arc<AppState>) {
 
     // Prepare command list
     let joined = state.commands.keys()
-        .fold(String::new(), |acc, s| acc + "\n" + s);
+        .fold(String::new(), |acc, s| {
+            if acc.is_empty() { s.to_string() } else { acc + "\n" + s }
+        });
 
     // Check if daemon is already running
     if is_daemon_running() {
