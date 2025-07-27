@@ -120,10 +120,8 @@ jobs:
           cp RELEASE_NOTES.md release_notes.md
         else
           echo "⚠️ No RELEASE_NOTES.md found - using default template"
-          cat > release_notes.md << 'EOF'
-          ## WindMenu ${{ steps.tag_info.outputs.tag }}
-          (Default release notes here...)
-          EOF
+          echo "## WindMenu ${{ steps.tag_info.outputs.tag }}" > release_notes.md
+          echo "(Default release notes here...)" >> release_notes.md
         fi
     
     - name: Create GitHub Release
