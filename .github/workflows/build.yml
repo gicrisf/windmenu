@@ -92,3 +92,49 @@ jobs:
           windmenu-installer.exe
           windmenu-portable.zip
         retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Get tag name
+      id: tag_info
+      run: echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: windmenu-build-${{ github.sha }}
+        path: ./artifacts
+    
+    - name: Move artifacts to root
+      run: mv ./artifacts/* ./
+    
+    - name: Prepare Release Notes
+      run: |
+        if [ -f "RELEASE_NOTES.md" ]; then
+          echo "✓ Using RELEASE_NOTES.md"
+          cp RELEASE_NOTES.md release_notes.md
+        else
+          echo "⚠️ No RELEASE_NOTES.md found - using default template"
+          cat > release_notes.md << 'EOF'
+## WindMenu ${{ steps.tag_info.outputs.tag }}
+(Default release notes here...)
+EOF
+        fi
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.tag_info.outputs.tag }}
+        name: WindMenu ${{ steps.tag_info.outputs.tag }}
+        body_path: release_notes.md
+        draft: false
+        prerelease: ${{ contains(steps.tag_info.outputs.tag, '-') }}
+        files: |
+          windmenu-installer.exe
+          windmenu-portable.zip
+        token: ${{ secrets.GITHUB_TOKEN }}
