@@ -35,6 +35,12 @@ jobs:
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     
+    - name: Make build script executable
+      run: chmod +x build-installer.sh
+    
+    - name: Run build installer script
+      run: ./build-installer.sh
+
     - name: Verify wlines-daemon.exe exists
       run: |
         if [ ! -f "assets/wlines-daemon.exe" ]; then
@@ -43,12 +49,6 @@ jobs:
           exit 1
         fi
         echo "✓ wlines-daemon.exe found"
-    
-    - name: Make build script executable
-      run: chmod +x build-installer.sh
-    
-    - name: Run build installer script
-      run: ./build-installer.sh
     
     - name: Verify build outputs
       run: |
