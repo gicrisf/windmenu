@@ -1,8 +1,8 @@
 ; Windmenu NSIS Installer Script
-; This installer bundles windmenu.exe, windmenu-monitor.exe, and wlines-daemon.exe
+; This installer bundles windmenu.exe and wlines-daemon.exe
 
 !define PRODUCT_NAME "Windmenu"
-!define PRODUCT_VERSION "0.1.0"
+!define PRODUCT_VERSION "0.5.0"
 !define PRODUCT_PUBLISHER "Giovanni Crisalfi"
 !define PRODUCT_WEB_SITE "https://github.com/gicrisf/windmenu"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\windmenu.exe"
@@ -43,8 +43,8 @@ RequestExecutionLevel user
 !insertmacro MUI_PAGE_INSTFILES
 
 ; Finish page
-!define MUI_FINISHPAGE_RUN "$INSTDIR\windmenu-monitor.exe"
-!define MUI_FINISHPAGE_RUN_TEXT "Start Windmenu Monitor"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\windmenu.exe"
+!define MUI_FINISHPAGE_RUN_TEXT "Start Windmenu Daemon"
 !insertmacro MUI_PAGE_FINISH
 
 ; Uninstaller pages
@@ -56,7 +56,7 @@ RequestExecutionLevel user
 ; Version information
 VIProductVersion "1.0.0.0"
 VIAddVersionKey "ProductName" "${PRODUCT_NAME}"
-VIAddVersionKey "Comments" "Window management utility with daemon and monitor"
+VIAddVersionKey "Comments" "Window management utility with daemon"
 VIAddVersionKey "CompanyName" "${PRODUCT_PUBLISHER}"
 VIAddVersionKey "LegalTrademarks" ""
 VIAddVersionKey "LegalCopyright" "© ${PRODUCT_PUBLISHER}"
@@ -73,7 +73,6 @@ Section "Core Files (required)" SecCore
   
   ; Install main binaries
   File "target\release\windmenu.exe"
-  File "target\release\windmenu-monitor.exe"
   File "assets\wlines-daemon.exe"
    
   ; Create uninstaller
@@ -93,13 +92,9 @@ SectionGroupEnd
 SectionGroup "Shortcuts" SecGrpShortcuts
 Section "Start Menu Shortcuts" SecStartMenu
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-  CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Windmenu Monitor.lnk" "$INSTDIR\windmenu-monitor.exe"
   CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\Uninstall.lnk" "$INSTDIR\uninstall.exe"
 SectionEnd
 
-Section "Desktop Shortcut" SecDesktop
-  CreateShortCut "$DESKTOP\Windmenu Monitor.lnk" "$INSTDIR\windmenu-monitor.exe"
-SectionEnd
 SectionGroupEnd
 
 SectionGroup /e "Auto-start Options" SecGrpAutoStart
@@ -214,10 +209,9 @@ SectionGroupEnd
 
 ; Component descriptions
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecCore} "Core Windmenu files (windmenu.exe, windmenu-monitor.exe, wlines-daemon.exe), configuration files, and startup scripts"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecCore} "Core Windmenu files (windmenu.exe, wlines-daemon.exe) and configuration files"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecStartMenu} "Create shortcuts in Start Menu"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecDesktop} "Create desktop shortcut for Windmenu Monitor"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartRegistry} "Start Windmenu automatically using Windows Registry (basic method, starts when current user logs in)"
+    !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartRegistry} "Start Windmenu automatically using Windows Registry (basic method, starts when current user logs in)"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartTask} "Start Windmenu automatically using Task Scheduler (recommended - most reliable, but needs admin privileges)"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartUser} "Start Windmenu automatically using current user's startup folder"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartAll} "Start Windmenu automatically using all users startup folder (affects all users on this computer)"
@@ -244,7 +238,6 @@ Section Uninstall
   
   ; Remove files and uninstaller
   Delete "$INSTDIR\windmenu.exe"
-  Delete "$INSTDIR\windmenu-monitor.exe"
   Delete "$INSTDIR\wlines-daemon.exe"
   Delete "$INSTDIR\start-windmenu-user.vbs"
   Delete "$INSTDIR\start-windmenu-all.vbs"
@@ -253,7 +246,6 @@ Section Uninstall
   ; Remove shortcuts
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\*.*"
   RMDir "$SMPROGRAMS\${PRODUCT_NAME}"
-  Delete "$DESKTOP\Windmenu Monitor.lnk"
   
   ; Remove directories if empty
   RMDir "$INSTDIR"
@@ -271,7 +263,7 @@ Function .onInit
     Abort
     
   close_processes:
-    nsExec::ExecToLog 'taskkill /F /IM windmenu.exe /IM windmenu-monitor.exe' 
+    nsExec::ExecToLog 'taskkill /F /IM windmenu.exe' 
 FunctionEnd
 
 ; Function to handle component selection changes

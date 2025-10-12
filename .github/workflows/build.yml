@@ -63,10 +63,6 @@ jobs:
           exit 1
         fi
         
-        if [ ! -f "target/x86_64-pc-windows-gnu/release/windmenu-monitor.exe" ]; then
-          echo "ERROR: windmenu-monitor.exe was not built!"
-          exit 1
-        fi
         
         echo "✓ All build outputs verified"
     
@@ -74,7 +70,6 @@ jobs:
       run: |
         mkdir -p release-portable
         cp target/x86_64-pc-windows-gnu/release/windmenu.exe release-portable/
-        cp target/x86_64-pc-windows-gnu/release/windmenu-monitor.exe release-portable/
         cp assets/wlines-daemon.exe release-portable/
         cp windmenu.toml release-portable/
         cp README.md release-portable/

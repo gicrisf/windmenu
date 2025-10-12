@@ -28,12 +28,6 @@ if (-not (Test-Path "target\release\windmenu.exe")) {
     exit 1
 }
 
-if (-not (Test-Path "target\release\windmenu-monitor.exe")) {
-    Write-Host "Error: windmenu-monitor.exe not found in target\release\" -ForegroundColor Red
-    Write-Host "Please build the project first with: cargo build --release" -ForegroundColor Yellow
-    Read-Host "Press Enter to exit"
-    exit 1
-}
 
 if (-not (Test-Path "assets\wlines-daemon.exe")) {
     Write-Host "wlines-daemon.exe not found in assets\, downloading..." -ForegroundColor Yellow

@@ -1,170 +1,244 @@
+# ===============================================================================
+# WindMenu Configuration File
+# ===============================================================================
+# This configuration file controls the appearance and behavior of WindMenu,
+# a Windows application launcher with a dmenu-like interface.
+
+# ===============================================================================
+# HOTKEY CONFIGURATION
+# ===============================================================================
 # Custom shortcut keys (default is WIN+SPACE if not specified)
 # Examples:
 # shortcut = ["WIN", "SPACE"]     # Default Win+Space
 # shortcut = ["CTRL", "ALT", "X"] # Ctrl+Alt+X
-# shortcut = ["ALT", "F2"]        # Alt+F2
+# shortcut = ["ALT", "F2"]        # Alt+F2 (like GNOME)
 # shortcut = ["WIN", "R"]         # Win+R (like Windows Run dialog)
 # Uncomment and modify the line below to use a custom shortcut:
 # shortcut = ["CTRL", "ALT", "SPACE"]
 
-[options]
-# Amount of lines to show in list
-# l = 0
-# Prompt to show before input
-p = "oi mbare, run something"
-# Sets the desired filter mode (see list below)
-# fm = ""
-# Initial selected line index
-# si = 0
-# Sets padding on window
-# px = 0
-# Sets width of the window and centers it on the screen
-# wx = 0
-# Background color
-# bg = ""
-# Foreground color
-# fg = ""
-# Selected background color
-sbg = "#285577"
-# Selected foreground color
-sfg = "#ffffff"
-# Text input background color
-# tbg = ""
-# Text input foreground color
-# tfg = ""
-# Font name
-# f = ""
-# Font size
-fs = 16
+# ===============================================================================
+# DAEMON CONFIGURATION
+# ===============================================================================
+# Path to wlines-daemon.exe (defaults to same directory as windmenu.exe if not set)
+# This specifies where to find the wlines daemon executable
+# Example paths:
+# wlines_daemon_path = "C:\\Users\\Username\\path\\to\\wlines-daemon.exe"
+# wlines_daemon_path = "./wlines-daemon.exe"
+# Uncomment and set the path below if using a custom wlines-daemon location:
+# wlines_daemon_path = "wlines-daemon.exe"
 
-# Basic example
-[[commands]]
-name = "beep beep"
-args = ["powershell", "[System.Media.SystemSounds]::Beep.Play()"]
+# Hotkey polling interval in milliseconds (default: 50)
+# How frequently windmenu checks for hotkey presses - lower values = more responsive but higher CPU usage
+# hotkey_poll_interval = 50
+
+# ===============================================================================
+# WLINES FALLBACK CONFIGURATION
+# ===============================================================================
+# Path to wlines.exe for direct execution when daemon is not running
+# This provides fallback functionality if the wlines daemon is unavailable
+# Example paths:
+# wlines_cli_path = "C:\\Users\\Username\\path\\to\\wlines.exe"
+# wlines_cli_path = "./wlines.exe"
+# Uncomment and set the path below if you want to use direct wlines execution:
+# wlines_cli_path = "wlines.exe"
+
+# ===============================================================================
+# WLINES THEME CONFIGURATION
+# ===============================================================================
+# Configure the appearance of the WindMenu interface using descriptive field names.
+# This section automatically generates wlines-config.txt with the appropriate settings.
+
+[theme]
+# -------------------------------------------------------------------------------
+# Window Settings
+# -------------------------------------------------------------------------------
+lines = 12                          # Number of menu items to display
+padding_x = 8                       # Horizontal padding in pixels
+width_x = 1000                      # Window width in pixels
+
+# -------------------------------------------------------------------------------
+# Color Scheme - Main Interface
+# -------------------------------------------------------------------------------
+background_color = "#1e1e1e"        # Main background color
+foreground_color = "#ffffff"        # Main text color
+
+# -------------------------------------------------------------------------------
+# Color Scheme - Selected Item
+# -------------------------------------------------------------------------------
+selected_background_color = "#285577"  # Highlighted item background
+selected_foreground_color = "#ffffff"  # Highlighted item text
+
+# -------------------------------------------------------------------------------
+# Color Scheme - Input Field
+# -------------------------------------------------------------------------------
+text_background_color = "#2d2d2d"   # Input field background color
+text_foreground_color = "#ffffff"   # Input field text color
+
+# -------------------------------------------------------------------------------
+# Font Configuration
+# -------------------------------------------------------------------------------
+font_name = "Consolas"              # Font family name (monospace recommended)
+font_size = 16                      # Font size in points
+
+# -------------------------------------------------------------------------------
+# Optional Interface Settings
+# -------------------------------------------------------------------------------
+prompt = "oi mbare, run something"  # Custom prompt text shown in input field
+filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
+# selected_index = 0                # Default selected item index (uncomment if needed)
+
+# ===============================================================================
+# BUILT-IN SPECIAL COMMANDS
+# ===============================================================================
+# WindMenu includes special built-in commands that are always available:
+# - "Toggle Caps Lock" - Toggles the Caps Lock key state
+# - "WLAN Scan" - Triggers a WiFi network scan and displays available networks
+#
+# These commands appear automatically in the menu and don't need to be configured.
+
+# ===============================================================================
+# CUSTOM COMMANDS
+# ===============================================================================
+# Define custom commands that appear in the menu alongside discovered applications.
+# Two command types are supported:
+# - args: Execute shell commands/programs
+# - keys: Send keyboard shortcuts
+
+# -------------------------------------------------------------------------------
+# Application Launch Commands
+# -------------------------------------------------------------------------------
+# Commands that launch applications or execute shell commands
 
 [[commands]]
-name = "emacs (via WSL 1)"
+name = "Windows Terminal"
+args = ["wt"]
+
+[[commands]]
+name = "Emacs (via WSL)"
 args = ["wsl", "-d", "Ubuntu-22.04", "-e", "env", "DISPLAY=localhost:0.0", "emacs"]
 
 [[commands]]
-name = "wt windows terminal"
-args = ["wt"]
+name = "System Beep"
+args = ["powershell", "[System.Media.SystemSounds]::Beep.Play()"]
 
-## Key combinations
-# Tabs
+# -------------------------------------------------------------------------------
+# Keyboard Shortcuts
+# -------------------------------------------------------------------------------
+
+# Key combination commands for Windows Terminal management
+
+## Tab Management
 [[commands]]
-name = "wt next tab"
+name = "WT Next Tab"
 keys = ["CTRL", "ALT", "RIGHT"]
 
 [[commands]]
-name = "wt prev tab"
+name = "WT Previous Tab"
 keys = ["CTRL", "ALT", "LEFT"]
 
 [[commands]]
-name = "wt settings"
+name = "WT Settings"
 keys = ["CTRL", "COMMA"]
 
 [[commands]]
-name = "wt new tab"
+name = "WT New Tab"
 keys = ["CTRL", "SHIFT", "T"]
 
-# Font size
+## Font Size Control
 [[commands]]
-name = "wt decrease font size"
+name = "WT Decrease Font Size"
 keys = ["CTRL", "-"]
 
 [[commands]]
-name = "wt increase font size"
+name = "WT Increase Font Size"
 keys = ["CTRL", "+"]
 
 [[commands]]
-name = "wt reset font size"
+name = "WT Reset Font Size"
 keys = ["CTRL", "0"]
 
-# Panes
+## Pane Management
 [[commands]]
-name = "wt duplicate pane"
+name = "WT Duplicate Pane"
 keys = ["ALT", "SHIFT", "D"]
 
 [[commands]]
-name = "wt duplicate pane and split down"
+name = "WT Split Pane Down"
 keys = ["ALT", "SHIFT", "-"]
 
 [[commands]]
-name = "wt duplicate pane and split right"
+name = "WT Split Pane Right"
 keys = ["ALT", "SHIFT", "+"]
 
 [[commands]]
-name = "wt close pane"
+name = "WT Close Pane"
 keys = ["CTRL", "SHIFT", "W"]
 
+## Pane Navigation
 [[commands]]
-name = "wt focus up"
+name = "WT Focus Up"
 keys = ["ALT", "UP"]
 
 [[commands]]
-name = "wt focus down"
+name = "WT Focus Down"
 keys = ["ALT", "DOWN"]
 
 [[commands]]
-name = "wt focus left"
+name = "WT Focus Left"
 keys = ["ALT", "LEFT"]
 
 [[commands]]
-name = "wt focus right"
+name = "WT Focus Right"
 keys = ["ALT", "RIGHT"]
 
+# Pane Resizing
 [[commands]]
-name = "wt resize pane up"
+name = "WT Resize Up"
 keys = ["ALT", "SHIFT", "UP"]
 
 [[commands]]
-name = "wt resize pane down"
+name = "WT Resize Down"
 keys = ["ALT", "SHIFT", "DOWN"]
 
 [[commands]]
-name = "wt resize pane left"
+name = "WT Resize Left"
 keys = ["ALT", "SHIFT", "LEFT"]
 
 [[commands]]
-name = "wt resize pane right"
+name = "WT Resize Right"
 keys = ["ALT", "SHIFT", "RIGHT"]
 
-# other stuff
+# Other Terminal Functions
 [[commands]]
-name = "wt find"
+name = "WT Find"
 keys = ["CTRL", "SHIFT", "F"]
 
 [[commands]]
-name = "wt new window"
+name = "WT New Window"
 keys = ["CTRL", "SHIFT", "N"]
 
 [[commands]]
-name = "wt toggle mark mode"
+name = "WT Toggle Mark Mode"
 keys = ["CTRL", "SHIFT", "M"]
 
+# Window Management
 [[commands]]
-name = "maximize"
+name = "Maximize Window"
 keys = ["WIN", "UP"]
 
-# System power commands
+# System Power Commands
 [[commands]]
-name = "shutdown (poweroff)"
+name = "Shutdown"
 args = ["shutdown.exe", "/s"]
 
 [[commands]]
-name = "reboot"
+name = "Restart"
 args = ["shutdown.exe", "/r"]
 
 [[commands]]
-name = "logoff"
+name = "Log Off"
 args = ["shutdown.exe", "/l"]
 
 [[commands]]
-name = "hibernate"
+name = "Hibernate"
 args = ["shutdown.exe", "/h"]
-
-# File manager commands
-[[commands]]
-name = "projects (D:)"
-args = ["yazi", "D:/projects"]

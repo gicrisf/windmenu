@@ -19,7 +19,6 @@ RUSTFLAGS="-C target-feature=+crt-static" \
 # Help NSIS
 mkdir -p target/release
 ln -sf "$(pwd)/target/x86_64-pc-windows-gnu/release/windmenu.exe" "target/release/"
-ln -sf "$(pwd)/target/x86_64-pc-windows-gnu/release/windmenu-monitor.exe" "target/release/"
 
 if [ $? -ne 0 ]; then
     echo -e "\033[0;31mError: Failed to build Rust projects\033[0m"
@@ -33,11 +32,6 @@ if [ ! -f "target/release/windmenu.exe" ]; then
     exit 1
 fi
 
-if [ ! -f "target/release/windmenu-monitor.exe" ]; then
-    echo -e "\033[0;31mError: windmenu-monitor.exe not found in target/release/\033[0m"
-    echo -e "\033[0;33mPlease build the project first with: cargo build --release\033[0m"
-    exit 1
-fi
 
 if [ ! -f "assets/wlines-daemon.exe" ]; then
     echo -e "\033[0;33mwlines-daemon.exe not found in assets/, downloading...\033[0m"

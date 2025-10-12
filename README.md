@@ -13,16 +13,6 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 - Background daemon with named pipe communication
 - Configurable appearance and behavior (thanks to JerwuQu's work on the original version of [wlines](https://github.com/gicrisf/wlines))
 
-## Daemon Monitor
-
-WindMenu includes a GUI monitor to check the status of both the WindMenu daemon and the WLines daemon:
-
-### Features
-- Real-time status monitoring of both daemons
-- Clean, native Windows GUI
-- Displays Process IDs (PIDs) when daemons are running
-- Lists all PIDs when multiple instances are detected (we don't want that)
-- Interactive buttons to start/restart/kill processes
 
 ## Build
 
@@ -32,43 +22,11 @@ Build all components:
 cargo build --release
 ```
 
-Build specific components:
-
-```bash
-# Main windmenu daemon
-cargo build --release --bin windmenu
-
-# Status monitor GUI
-cargo build --release --bin windmenu-monitor
-```
 
 ### Usage
 
 Ensure both daemons are running and press `WIN+SPACE` to start the launcher.
 
-You can check the daemons' status using windmenu-monitor. If you find an inactive daemon, you can start it from windmenu-monitor itself.
-
-After compiling, just:
-
-```bash
-.\target\release\windmenu-monitor.exe
-```
-
-Example display:
-- `● Windmenu: Active (PID: 12345)` - Single instance
-- `● Windmenu: Active (2 instances: 12345, 67890)` - Multiple instances
-- `● Windmenu: Inactive` - No processes running
-
-### Interactive Controls
-
-The monitor includes clickable buttons for process management.
-
-- Buttons are automatically enabled/disabled based on the current process state.
-- Buttons darken and shift slightly when pressed
-- Inner shadow effect during press
-- Immediate visual response for better user experience
-
-The monitor provides a visual confirmation that both windmenu and wlines daemons are running properly and lets you stop/start them easily.
 
 ## Installer
 
@@ -103,7 +61,6 @@ Both scripts will:
 
 The installer is completely self-contained and includes:
 - `windmenu.exe` - Main windmenu daemon
-- `windmenu-monitor.exe` - GUI monitor application
 - `wlines-daemon.exe` - External wlines daemon dependency
 
 ### Installation Options
@@ -112,10 +69,7 @@ The installer provides several installation components:
 
 #### Core Installation
 1. **Core Files (required)**: Main binaries, configuration, and dependencies
-2. **Start Menu Shortcuts**: Creates shortcuts in the Start Menu, including:
-   - Windmenu Monitor (primary interface for status checking and daemon management)
-   - Uninstall
-3. **Desktop Shortcut**: Creates a desktop shortcut for Windmenu Monitor
+2. **Start Menu Shortcuts**: Creates shortcuts in the Start Menu
 4. **Auto-startup Options**
 
 #### Auto-startup Options
@@ -142,7 +96,6 @@ After installation, the following structure will be created:
 ```
 %LOCALAPPDATA%\windmenu\
 ├── windmenu.exe
-├── windmenu-monitor.exe
 ├── wlines-daemon.exe
 └── uninstall.exe
 ```
