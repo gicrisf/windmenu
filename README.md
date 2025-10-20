@@ -14,6 +14,72 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 - Configurable appearance and behavior (thanks to JerwuQu's work on the original version of [wlines](https://github.com/gicrisf/wlines))
 
 
+## Quickstart
+
+Want to try Windmenu? You can get it running with just a handful of commands:
+
+```powershell
+# Clone and build
+git clone https://github.com/gicrisf/windmenu.git && cd windmenu && cargo build --release
+
+# Fetch dependencies and start
+cd target\release && .\windmenu.exe fetch wlines-daemon && .\windmenu.exe daemon all start
+```
+
+That's it. Press `Win+Space` and start typing. Your installed applications appear instantly. Type a few characters to filter, press Enter to launch.
+
+### Customizing the Hotkey
+
+To customize the hotkey or add your own commands, edit `windmenu.toml` in the same directory as the executable:
+
+```toml
+# Change the hotkey
+shortcut = ["WIN", "SPACE"]  # Default
+
+# If you use multiple keyboard layouts, try one of these instead:
+# shortcut = ["WIN", "R"]
+# shortcut = ["ALT", "SPACE"]
+# shortcut = ["CTRL", "SPACE"]
+```
+
+**Note on the default hotkey**: `Win+Space` is Windows' language switcher shortcut. If you only use one keyboard layout (like US English), this won't matter - the conflict is harmless. But if you switch between multiple languages, you'll want to change the hotkey to something else.
+
+For full configuration options, check the [example windmenu.toml](https://github.com/gicrisf/windmenu/blob/main/windmenu.toml) in the repository.
+
+## Commands
+
+The menu is populated from three sources:
+
+### 1. Start Menu Shortcuts (discovered automatically)
+
+Windmenu scans for `.lnk` files in the Windows Start Menu directories (`%APPDATA%` and `%ProgramData%`). This is how it finds your installed applications. The scanning happens once at startup, so the menu appears instantly when you press the hotkey.
+
+### 2. Custom Commands (configured in `windmenu.toml`)
+
+You can add your own commands in two forms:
+
+**PowerShell invocations:**
+```toml
+[[commands]]
+name = "Terminal"
+args = ["wt"]
+```
+
+**Key combinations:**
+```toml
+[[commands]]
+name = "Show Desktop"
+keys = ["WIN", "D"]
+```
+
+The key combination support turned out to be more useful than expected. Want to switch virtual desktops? `["WIN", "CTRL", "RIGHT"]`. Toggle between windows? `["ALT", "TAB"]`. These are first-class commands in the menu, no different from launching applications.
+
+Implementation uses Windows `SendInput` API with proper key sequencing (press all keys down in order, release in reverse). There's special handling for toggle keys like Caps Lock, which Windows treats differently.
+
+### 3. Special Commands (always active)
+
+These are built-in commands that are always available, primarily useful for edge cases. For example, the Caps Lock toggle command is handy if you've remapped your physical Caps Lock key to something else but occasionally need to actually toggle caps lock state.
+
 ## Build
 
 Build all components:
@@ -21,11 +87,6 @@ Build all components:
 ```bash
 cargo build --release
 ```
-
-
-### Usage
-
-Ensure both daemons are running and press `WIN+SPACE` to start the launcher.
 
 
 ## Installer
