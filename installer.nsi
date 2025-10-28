@@ -233,8 +233,8 @@ Section Uninstall
   Pop $0 ; ignore return value
   
   ; Startup folder methods
-  Delete "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\start-windmenu.vbs"
-  Delete "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\start-windmenu.vbs"
+  Delete "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\start-windmenu-user.vbs"
+  Delete "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\start-windmenu-all.vbs"
   
   ; Remove files and uninstaller
   Delete "$INSTDIR\windmenu.exe"

@@ -49,43 +49,19 @@
 # This section automatically generates wlines-config.txt with the appropriate settings.
 
 [theme]
-# -------------------------------------------------------------------------------
-# Window Settings
-# -------------------------------------------------------------------------------
 lines = 12                          # Number of menu items to display
 padding_x = 8                       # Horizontal padding in pixels
 width_x = 1000                      # Window width in pixels
-
-# -------------------------------------------------------------------------------
-# Color Scheme - Main Interface
-# -------------------------------------------------------------------------------
-background_color = "#1e1e1e"        # Main background color
-foreground_color = "#ffffff"        # Main text color
-
-# -------------------------------------------------------------------------------
-# Color Scheme - Selected Item
-# -------------------------------------------------------------------------------
-selected_background_color = "#285577"  # Highlighted item background
-selected_foreground_color = "#ffffff"  # Highlighted item text
-
-# -------------------------------------------------------------------------------
-# Color Scheme - Input Field
-# -------------------------------------------------------------------------------
-text_background_color = "#2d2d2d"   # Input field background color
-text_foreground_color = "#ffffff"   # Input field text color
-
-# -------------------------------------------------------------------------------
-# Font Configuration
-# -------------------------------------------------------------------------------
+background_color = "#1e1e2e"        # Main background color (Catppuccin Mocha base)
+foreground_color = "#cdd6f4"        # Main text color (Catppuccin Mocha text)
+selected_background_color = "#89b4fa"  # Highlighted item background (Catppuccin Mocha blue)
+selected_foreground_color = "#1e1e2e"  # Highlighted item text (dark on light)
+text_background_color = "#313244"   # Input field background color (Catppuccin Mocha surface0)
+text_foreground_color = "#cdd6f4"   # Input field text color (Catppuccin Mocha text)
 font_name = "Consolas"              # Font family name (monospace recommended)
-font_size = 16                      # Font size in points
-
-# -------------------------------------------------------------------------------
-# Optional Interface Settings
-# -------------------------------------------------------------------------------
-prompt = "oi mbare, run something"  # Custom prompt text shown in input field
+font_size = 20                      # Font size in points
+prompt = "Catppuccin run :3"                     # Custom prompt text shown in input field
 filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
-# selected_index = 0                # Default selected item index (uncomment if needed)
 
 # ===============================================================================
 # BUILT-IN SPECIAL COMMANDS

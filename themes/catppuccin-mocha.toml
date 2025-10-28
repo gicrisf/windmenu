@@ -1,0 +1,37 @@
+# ===============================================================================
+# WindMenu Configuration - Catppuccin Mocha Theme
+# ===============================================================================
+
+[theme]
+lines = 12                          # Number of menu items to display
+padding_x = 8                       # Horizontal padding in pixels
+width_x = 1000                      # Window width in pixels
+background_color = "#1e1e2e"        # Main background color (Catppuccin Mocha base)
+foreground_color = "#cdd6f4"        # Main text color (Catppuccin Mocha text)
+selected_background_color = "#89b4fa"  # Highlighted item background (Catppuccin Mocha blue)
+selected_foreground_color = "#1e1e2e"  # Highlighted item text (dark on light)
+text_background_color = "#313244"   # Input field background color (Catppuccin Mocha surface0)
+text_foreground_color = "#cdd6f4"   # Input field text color (Catppuccin Mocha text)
+font_name = "Consolas"              # Font family name (monospace recommended)
+font_size = 16                      # Font size in points
+prompt = "Run:"                     # Custom prompt text shown in input field
+filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
+
+# ===============================================================================
+# Catppuccin Mocha Palette Reference
+# ===============================================================================
+# Alternative accent colors you can use for selected_background_color:
+# - Rosewater: #f5e0dc (soft pink)
+# - Flamingo:  #f2cdcd (peachy pink)
+# - Pink:      #f5c2e7 (bright pink)
+# - Mauve:     #cba6f7 (purple)
+# - Red:       #f38ba8 (red)
+# - Maroon:    #eba0ac (dark pink)
+# - Peach:     #fab387 (orange)
+# - Yellow:    #f9e2af (warm yellow)
+# - Green:     #a6e3a1 (soft green)
+# - Teal:      #94e2d5 (cyan-green)
+# - Sky:       #89dceb (light blue)
+# - Sapphire:  #74c7ec (blue-cyan)
+# - Blue:      #89b4fa (default - current selection)
+# - Lavender:  #b4befe (light purple)

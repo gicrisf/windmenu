@@ -43,6 +43,7 @@ impl fmt::Display for WlanError {
 
 impl std::error::Error for WlanError {}
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum AcmNotificationCode {
     AutoconfEnabled = 1,
@@ -387,7 +388,10 @@ impl WlanClient {
                 return Err(WlanError::NoInterfaces);
             }
 
-            let interfaces = &(*interface_list).InterfaceInfo[..num_interfaces as usize];
+            let interfaces = std::slice::from_raw_parts(
+                (*interface_list).InterfaceInfo.as_ptr(),
+                num_interfaces as usize
+            );
 
             let result = interfaces
                 .iter()

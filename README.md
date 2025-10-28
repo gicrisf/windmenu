@@ -262,3 +262,11 @@ keys = ["WIN", "CTRL", "1"]
 ```
 
 The menu will display both types of commands and execute them appropriately based on their configuration.
+
+## Acknowledgments
+
+WindMenu wouldn't be possible without the contributions of others:
+
+- **[wlines](https://github.com/gicrisf/wlines)** - The excellent menu rendering engine that powers WindMenu's interface. Special thanks to [JerwuQu](https://github.com/JerwuQu/wlines) for the original implementation.
+- **[dmenu](https://tools.suckless.org/dmenu/)** - The original inspiration for this project. WindMenu aims to bring dmenu's philosophy and efficiency to Windows.
+- **[winapi-rs](https://github.com/retep998/winapi-rs)** maintainers - For providing comprehensive Rust bindings to the Windows API, making native Windows development in Rust possible.

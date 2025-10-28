@@ -8,22 +8,22 @@
 # If you manually edit this file, restart the wlines daemon to apply changes.
 
 # Appearance settings
--bg #1e1e1e
--fg #ffffff
--sbg #285577
--sfg #ffffff
--tbg #2d2d2d
--tfg #ffffff
+-bg #1e1e2e
+-fg #cdd6f4
+-sbg #89b4fa
+-sfg #1e1e2e
+-tbg #313244
+-tfg #cdd6f4
 
 # Font settings
 -f "Consolas"
--fs 16
+-fs 20
 
 # Window settings
 -l 12
 -px 8
 -wx 1000
--p "oi mbare, run something"
+-p "Catppuccin run :3"
 -fm fuzzy
 
 # Other settings

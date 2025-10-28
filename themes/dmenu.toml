@@ -1,0 +1,18 @@
+# ===============================================================================
+# WindMenu Configuration - dmenu Theme
+# ===============================================================================
+
+[theme]
+lines = 12                          # Number of menu items to display
+padding_x = 8                       # Horizontal padding in pixels
+width_x = 1000                      # Window width in pixels
+background_color = "#1e1e1e"        # Main background color
+foreground_color = "#ffffff"        # Main text color
+selected_background_color = "#285577"  # Highlighted item background
+selected_foreground_color = "#ffffff"  # Highlighted item text
+text_background_color = "#2d2d2d"   # Input field background color
+text_foreground_color = "#ffffff"   # Input field text color
+font_name = "Consolas"              # Font family name (monospace recommended)
+font_size = 16                      # Font size in points
+prompt = "Run:"                     # Custom prompt text shown in input field
+filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"

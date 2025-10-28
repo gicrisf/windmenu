@@ -1,0 +1,29 @@
+# ===============================================================================
+# WindMenu Configuration - Hatsune Miku Theme
+# ===============================================================================
+
+[theme]
+lines = 12                          # Number of menu items to display
+padding_x = 8                       # Horizontal padding in pixels
+width_x = 1000                      # Window width in pixels
+background_color = "#242829"        # Main background color (dark gray)
+foreground_color = "#dcd7d7"        # Main text color (light gray)
+selected_background_color = "#7cc7d6"  # Highlighted item background (iconic Miku cyan)
+selected_foreground_color = "#242829"  # Highlighted item text (dark on light)
+text_background_color = "#333738"   # Input field background color (slightly lighter than base)
+text_foreground_color = "#dcd7d7"   # Input field text color (light gray)
+font_name = "Consolas"              # Font family name (monospace recommended)
+font_size = 16                      # Font size in points
+prompt = "Run:"                     # Custom prompt text shown in input field
+filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
+
+# ===============================================================================
+# Hatsune Miku Palette Reference
+# ===============================================================================
+# Alternative accent colors you can use for selected_background_color:
+# - Cyan:    #7cc7d6 (default - iconic Miku teal)
+# - Magenta: #bc7fd2 (purple/pink accent)
+# - Pink:    #df2683 (bright pink/red)
+# - Blue:    #1a86b9 (deep blue)
+# - Green:   #13868c (teal-green)
+# - Yellow:  #fcfcdf (cream/pale yellow)

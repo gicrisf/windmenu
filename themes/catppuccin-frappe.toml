@@ -1,0 +1,37 @@
+# ===============================================================================
+# WindMenu Configuration - Catppuccin Frappé Theme
+# ===============================================================================
+
+[theme]
+lines = 12                          # Number of menu items to display
+padding_x = 8                       # Horizontal padding in pixels
+width_x = 1000                      # Window width in pixels
+background_color = "#303446"        # Main background color (Catppuccin base)
+foreground_color = "#c6d0f5"        # Main text color (Catppuccin text)
+selected_background_color = "#8caaee"  # Highlighted item background (Catppuccin blue)
+selected_foreground_color = "#303446"  # Highlighted item text (dark on light)
+text_background_color = "#414559"   # Input field background color (Catppuccin surface0)
+text_foreground_color = "#c6d0f5"   # Input field text color (Catppuccin text)
+font_name = "Consolas"              # Font family name (monospace recommended)
+font_size = 16                      # Font size in points
+prompt = "Run:"                     # Custom prompt text shown in input field
+filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
+
+# ===============================================================================
+# Catppuccin Frappé Palette Reference
+# ===============================================================================
+# Alternative accent colors you can use for selected_background_color:
+# - Rosewater: #f2d5cf (soft pink)
+# - Flamingo:  #eebebe (peachy pink)
+# - Pink:      #f4b8e4 (bright pink)
+# - Mauve:     #ca9ee6 (purple)
+# - Red:       #e78284 (red)
+# - Maroon:    #ea999c (dark pink)
+# - Peach:     #ef9f76 (orange)
+# - Yellow:    #e5c890 (warm yellow)
+# - Green:     #a6d189 (soft green)
+# - Teal:      #81c8be (cyan-green)
+# - Sky:       #99d1db (light blue)
+# - Sapphire:  #85c1dc (blue-cyan)
+# - Blue:      #8caaee (default - current selection)
+# - Lavender:  #babbf1 (light purple)
