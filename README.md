@@ -16,17 +16,28 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 
 ## Quickstart
 
-Want to try Windmenu? You can get it running with just a handful of commands:
+Download from the [latest release](https://github.com/gicrisf/windmenu/releases/latest):
+
+### Option 1: Installer (GUI Setup)
+- Download `windmenu-installer.exe`
+- Run the wizard and follow the prompts
+
+Done! Press `Win+Space` and type.
+
+### Option 2: Portable ZIP (CLI Setup)
+- Download `windmenu-portable.zip` and extract it
+- Setup everything via the windmenu.exe CLI:
 
 ```powershell
-# Clone and build
-git clone https://github.com/gicrisf/windmenu.git && cd windmenu && cargo build --release
+# Fetch dependencies and start both daemons
+.\windmenu.exe fetch wlines-daemon
+.\windmenu.exe daemon all start
 
-# Fetch dependencies and start
-cd target\release && .\windmenu.exe fetch wlines-daemon && .\windmenu.exe daemon all start
+# Optional: enable auto-startup. Learn how through:
+# .\windmenu.exe daemon all enable --help
 ```
 
-That's it. Press `Win+Space` and start typing. Your installed applications appear instantly. Type a few characters to filter, press Enter to launch.
+Again, `Win+Space` to launch.
 
 ### Customizing the Hotkey
 
