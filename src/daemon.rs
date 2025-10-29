@@ -391,7 +391,16 @@ impl Daemon for WindmenuDaemon {
         // For windmenu, check if any instance other than current is running
         let current_pid = std::process::id();
         let processes = find_processes_with_name(self.process_name());
-        processes.iter().any(|proc| proc.pid != current_pid)
+
+        // Get parent PID to exclude shims
+        let parent_pid = processes.iter()
+            .find(|p| p.pid == current_pid)
+            .map(|p| p.parent_pid);
+
+        // Exclude current process and parent process
+        processes.iter().any(|proc| {
+            proc.pid != current_pid && Some(proc.pid) != parent_pid
+        })
     }
 
     fn start(&self) -> Result<(), DaemonError> {

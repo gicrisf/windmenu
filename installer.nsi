@@ -2,7 +2,7 @@
 ; This installer bundles windmenu.exe and wlines-daemon.exe
 
 !define PRODUCT_NAME "Windmenu"
-!define PRODUCT_VERSION "0.5.0"
+!define PRODUCT_VERSION "0.5.1"
 !define PRODUCT_PUBLISHER "Giovanni Crisalfi"
 !define PRODUCT_WEB_SITE "https://github.com/gicrisf/windmenu"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\windmenu.exe"
@@ -44,6 +44,7 @@ RequestExecutionLevel user
 
 ; Finish page
 !define MUI_FINISHPAGE_RUN "$INSTDIR\windmenu.exe"
+!define MUI_FINISHPAGE_RUN_PARAMETERS "daemon all start"
 !define MUI_FINISHPAGE_RUN_TEXT "Start Windmenu Daemon"
 !insertmacro MUI_PAGE_FINISH
 
@@ -99,8 +100,7 @@ SectionGroupEnd
 
 SectionGroup /e "Auto-start Options" SecGrpAutoStart
 Section /o "Registry Run (Basic)" SecAutoStartRegistry
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" "$INSTDIR\windmenu.exe"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WlinesDaemon" "$INSTDIR\wlines-daemon.exe"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" '"$INSTDIR\windmenu.exe" daemon all start'
 SectionEnd
 
 Section /o "Task Scheduler (Admin)" SecAutoStartTask
@@ -161,10 +161,7 @@ Section /o "Task Scheduler (Admin)" SecAutoStartTask
   FileWrite $0 '  <Actions Context="Author">$\r$\n'
   FileWrite $0 '    <Exec>$\r$\n'
   FileWrite $0 '      <Command>$INSTDIR\windmenu.exe</Command>$\r$\n'
-  FileWrite $0 '      <WorkingDirectory>$INSTDIR</WorkingDirectory>$\r$\n'
-  FileWrite $0 '    </Exec>$\r$\n'
-  FileWrite $0 '    <Exec>$\r$\n'
-  FileWrite $0 '      <Command>$INSTDIR\wlines-daemon.exe</Command>$\r$\n'
+  FileWrite $0 '      <Arguments>daemon all start</Arguments>$\r$\n'
   FileWrite $0 '      <WorkingDirectory>$INSTDIR</WorkingDirectory>$\r$\n'
   FileWrite $0 '    </Exec>$\r$\n'
   FileWrite $0 '  </Actions>$\r$\n'
@@ -188,9 +185,9 @@ Section /o "Current User Startup Folder" SecAutoStartUser
   ; Create VBS script for silent startup
   FileOpen $0 "$INSTDIR\start-windmenu-user.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe""", 0, False$\r$\n'
+  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon all start", 0, False$\r$\n'
   FileClose $0
-  
+
   ; Copy to user startup folder
   CopyFiles "$INSTDIR\start-windmenu-user.vbs" "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\"
 SectionEnd
@@ -199,9 +196,9 @@ Section /o "All Users Startup Folder" SecAutoStartAll
   ; Create VBS script for silent startup
   FileOpen $0 "$INSTDIR\start-windmenu-all.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe""", 0, False$\r$\n'
+  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon all start", 0, False$\r$\n'
   FileClose $0
-  
+
   ; Copy to all users startup folder (requires admin privileges)
   CopyFiles "$INSTDIR\start-windmenu-all.vbs" "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\"
 SectionEnd
@@ -226,7 +223,6 @@ Section Uninstall
   ; Remove all possible startup methods
   ; Registry Run method
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon"
-  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WlinesDaemon"
   
   ; Task Scheduler method
   nsExec::ExecToLog 'schtasks /delete /tn "windmenu" /f'
