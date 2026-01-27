@@ -9,12 +9,12 @@
 # ===============================================================================
 # Custom shortcut keys (default is WIN+SPACE if not specified)
 # Examples:
-# shortcut = ["WIN", "SPACE"]     # Default Win+Space
-# shortcut = ["CTRL", "ALT", "X"] # Ctrl+Alt+X
-# shortcut = ["ALT", "F2"]        # Alt+F2 (like GNOME)
-# shortcut = ["WIN", "R"]         # Win+R (like Windows Run dialog)
+# hotkey = ["WIN", "SPACE"]     # Default Win+Space
+# hotkey = ["CTRL", "ALT", "X"] # Ctrl+Alt+X
+# hotkey = ["ALT", "F2"]        # Alt+F2 (like GNOME)
+# hotkey = ["WIN", "R"]         # Win+R (like Windows Run dialog)
 # Uncomment and modify the line below to use a custom shortcut:
-# shortcut = ["CTRL", "ALT", "SPACE"]
+# hotkey = ["CTRL", "ALT", "SPACE"]
 
 # ===============================================================================
 # DAEMON CONFIGURATION
