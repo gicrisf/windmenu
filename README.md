@@ -16,20 +16,27 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 
 ## Quickstart
 
-Download from the [latest release](https://github.com/gicrisf/windmenu/releases/latest):
-
-### Option 1: Installer (GUI Setup)
-- Download `windmenu-installer.exe`
-- Run the wizard and follow the prompts
-
-Done! Press `Win+Space` and type.
-
-### Option 2: Portable ZIP (CLI Setup)
-- Download `windmenu-portable.zip` and extract it
-- Setup everything via the windmenu.exe CLI:
+### Option 1: Scoop (Recommended)
 
 ```powershell
-# Fetch dependencies and start both daemons
+scoop bucket add gicrisf https://github.com/gicrisf/bucket
+scoop install windmenu
+```
+
+Then set up the daemons:
+
+```powershell
+windmenu daemon all start
+
+# Optional: enable auto-startup. Learn how through:
+# windmenu daemon all enable --help
+```
+
+### Option 2: Portable ZIP
+
+Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and set up via CLI:
+
+```powershell
 .\windmenu.exe fetch wlines-daemon
 .\windmenu.exe daemon all start
 
@@ -37,7 +44,7 @@ Done! Press `Win+Space` and type.
 # .\windmenu.exe daemon all enable --help
 ```
 
-Again, `Win+Space` to launch.
+Press `Win+Space` to launch.
 
 ### Customizing the Hotkey
 
@@ -100,94 +107,16 @@ cargo build --release
 ```
 
 
-## Installer
+## Uninstallation
 
-This directory contains the NSIS installer script and build tools for creating a Windmenu installer package.
-
-### Prerequisites
-
-1. NSIS (Nullsoft Scriptable Install System)
-2. Rust toolchain
-
-### Building the Installer
-
-The build process is fully automated and handles all dependencies:
-
-**On Windows (PowerShell):**
+If installed via Scoop:
 ```powershell
-.\build-installer.ps1
+windmenu daemon all stop
+windmenu daemon all disable
+scoop uninstall windmenu
 ```
 
-**On Linux/WSL (Bash):**
-```bash
-./build-installer.sh
-```
-
-Both scripts will:
-1. **Build Rust projects**
-2. **Download dependencies automatically** if missing:
-   - `wlines-daemon.exe` from [wlines releases](https://github.com/gicrisf/wlines/releases/)
-3. **Create the NSIS installer** with all components bundled
-
-### Bundled Dependencies
-
-The installer is completely self-contained and includes:
-- `windmenu.exe` - Main windmenu daemon
-- `wlines-daemon.exe` - External wlines daemon dependency
-
-### Installation Options
-
-The installer provides several installation components:
-
-#### Core Installation
-1. **Core Files (required)**: Main binaries, configuration, and dependencies
-2. **Start Menu Shortcuts**: Creates shortcuts in the Start Menu
-4. **Auto-startup Options**
-
-#### Auto-startup Options
-Choose **one** of the following startup methods:
-
-1. Registry Run (Suggested)
-2. Task Scheduler
-3. Current User Startup Folder
-4. All Users Startup Folder (affects all users and requires permissions)
-
-### Dependency Management
-
-#### Runtime Dependencies
-WindMenu uses static linking to minimize external dependencies. No additional runtime libraries are required on modern Windows 10/11 systems. (Should theoretically work on any Windows version from XP onward, though it has only been tested on Windows 10/11)
-
-### Default Installation Location
-
-The installer defaults to installing in `%LOCALAPPDATA%\windmenu`, but users can choose a different location during installation.
-
-### Files Created
-
-After installation, the following structure will be created:
-
-```
-%LOCALAPPDATA%\windmenu\
-├── windmenu.exe
-├── wlines-daemon.exe
-└── uninstall.exe
-```
-
-### Uninstallation
-
-The installer creates an uninstaller that:
-- Removes all installed files and created directories
-- Cleans up all startup methods (Registry, Task Scheduler, Startup folders)
-- Removes all shortcuts and registry entries
-- Can be accessed through:
-  - Control Panel → Programs and Features
-  - Start Menu → Windmenu → Uninstall
-  - Directly running `uninstall.exe` from the installation directory
-
-The uninstaller ensures complete removal regardless of which startup method was selected during installation.
-
-For manual verification, check the installation directory (typically `%LOCALAPPDATA%\windmenu\` or your custom location). The application is portable, so all binaries and configurations reside within this directory. Simply deleting it will remove all traces from your system, as no other files are stored elsewhere. 
-
-> N.B. The uninstaller removes only installed files, keeping any manually edited configs. These remain for future reinstalls. Delete them manually if needed.
+For portable installs, stop the daemons and delete the directory. The application is fully portable — all binaries and configuration reside within the install directory, so no traces are left elsewhere. Auto-startup entries (Registry, Task Scheduler, or Startup folder) can be cleaned up with `windmenu daemon all disable` before removing the files.
 
 ## Key Combination Commands
 
