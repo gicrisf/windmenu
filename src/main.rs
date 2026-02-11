@@ -109,6 +109,9 @@ enum TestType {
     /// Trigger WLAN scan on all interfaces
     #[command(name = "wlan-scan")]
     WlanScan,
+    /// Show config resolution paths
+    #[command(name = "config")]
+    Config,
 }
 
 #[derive(Subcommand)]
@@ -431,6 +434,9 @@ fn handle_test_command(test_type: TestType) {
         }
         TestType::WlanScan => {
             test_wlan_scan();
+        }
+        TestType::Config => {
+            menu::print_config_debug();
         }
     }
 }

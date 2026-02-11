@@ -157,6 +157,25 @@ impl MenuConfig {
     }
 }
 
+pub fn print_config_debug() {
+    let exe_path = env::current_exe().ok();
+    println!("Exe path: {}", exe_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "unknown".into()));
+    println!("CWD: {}", env::current_dir().map(|p| p.display().to_string()).unwrap_or_else(|_| "unknown".into()));
+
+    let cwd_config = Path::new(MenuConfig::DEFAULT_CONFIG_PATH);
+    println!("CWD config ({}): {}", cwd_config.display(), if cwd_config.exists() { "found" } else { "not found" });
+
+    if let Some(exe_dir) = exe_path.as_ref().and_then(|p| p.parent()) {
+        let exe_config = exe_dir.join(MenuConfig::DEFAULT_CONFIG_PATH);
+        println!("Exe config ({}): {}", exe_config.display(), if exe_config.exists() { "found" } else { "not found" });
+    }
+
+    match MenuConfig::load() {
+        Ok((_, config_dir)) => println!("Result: loaded from {}", config_dir.display()),
+        Err(e) => println!("Result: {}", e),
+    }
+}
+
 
 #[derive(Debug, Deserialize)]
 struct CommandConfig {
