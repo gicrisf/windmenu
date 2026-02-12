@@ -125,7 +125,7 @@ impl WlinesTheme {
 
         config_content.push_str("\n# Font settings\n");
         if let Some(font_name) = &theme.font_name {
-            config_content.push_str(&format!("-f \"{}\"\n", font_name));
+            config_content.push_str(&format!("-f {}\n", font_name));
         }
         if let Some(font_size) = theme.font_size {
             config_content.push_str(&format!("-fs {}\n", font_size));
@@ -143,7 +143,7 @@ impl WlinesTheme {
         }
 
         if let Some(prompt) = &theme.prompt {
-            config_content.push_str(&format!("-p \"{}\"\n", prompt));
+            config_content.push_str(&format!("-p {}\n", prompt));
         }
         if let Some(filter_mode) = &theme.filter_mode {
             config_content.push_str(&format!("-fm {}\n", filter_mode));
