@@ -14,7 +14,6 @@ Write-Host "Fetching latest release..." -ForegroundColor Yellow
 try {
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/gicrisf/windmenu/releases/latest" -UseBasicParsing
     $tag = $release.tag_name
-    $version = $tag -replace '^v', ''
 } catch {
     Write-Host "Error: Failed to fetch latest release from GitHub." -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
@@ -24,18 +23,6 @@ try {
 Write-Host "Latest version: $tag" -ForegroundColor Green
 Write-Host "Install directory: $InstallDir" -ForegroundColor Green
 Write-Host ""
-
-# Stop running daemons if windmenu is already installed
-$existingExe = Join-Path $InstallDir "windmenu.exe"
-if (Test-Path $existingExe) {
-    Write-Host "Existing installation found, stopping daemons..." -ForegroundColor Yellow
-    try {
-        & $existingExe daemon all stop 2>$null
-    } catch {
-        # Ignore errors — daemons may not be running
-    }
-    Start-Sleep -Seconds 1
-}
 
 # Download portable zip to temp
 $zipUrl = "https://github.com/gicrisf/windmenu/releases/download/$tag/windmenu-portable.zip"
@@ -67,7 +54,8 @@ try {
 Remove-Item $tempZip -ErrorAction SilentlyContinue
 
 # Verify extraction
-if (-not (Test-Path $existingExe)) {
+$windmenuExe = Join-Path $InstallDir "windmenu.exe"
+if (-not (Test-Path $windmenuExe)) {
     Write-Host "Error: windmenu.exe not found after extraction." -ForegroundColor Red
     exit 1
 }
@@ -91,20 +79,17 @@ if ($alreadyInPath) {
     }
 }
 
-# Start daemons
-Write-Host ""
-Write-Host "Starting daemons..." -ForegroundColor Yellow
-& $existingExe daemon all start
-
 # Done
 Write-Host ""
-Write-Host "windmenu $tag installed successfully!" -ForegroundColor Green
+Write-Host "windmenu $tag installed to $InstallDir" -ForegroundColor Green
 Write-Host ""
-Write-Host "Press Win+Space to launch the menu." -ForegroundColor Cyan
+Write-Host "To get started, run:" -ForegroundColor Cyan
+Write-Host "  windmenu fetch wlines-daemon" -ForegroundColor White
+Write-Host "  windmenu daemon all start" -ForegroundColor White
 Write-Host ""
-Write-Host "To enable auto-startup:" -ForegroundColor Cyan
-Write-Host "  windmenu daemon all enable task" -ForegroundColor White
+Write-Host "Then press Win+Space to launch the menu." -ForegroundColor Cyan
 Write-Host ""
-Write-Host "To customize hotkey and commands, edit:" -ForegroundColor Cyan
-Write-Host "  $InstallDir\windmenu.toml" -ForegroundColor White
+Write-Host "Optional:" -ForegroundColor Cyan
+Write-Host "  windmenu daemon all enable task    # auto-start on login" -ForegroundColor White
+Write-Host "  notepad $InstallDir\windmenu.toml  # customize hotkey and commands" -ForegroundColor White
 Write-Host ""
