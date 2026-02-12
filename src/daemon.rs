@@ -421,11 +421,11 @@ impl Daemon for WindmenuDaemon {
             return Err(DaemonError::AlreadyRunning);
         }
 
-        // let current_exe = env::current_exe()
-        //     .map_err(|e| DaemonError::StartupFailed(format!("Failed to get current executable path: {}", e)))?;
-        // I used current exe before:
-        // let child = Command::new(&current_exe)
-        let mut cmd = Command::new(self.path());
+        // Always spawn ourselves via current_exe() to avoid going through
+        // package manager shims, which may allocate a visible console window.
+        let current_exe = env::current_exe()
+            .map_err(|e| DaemonError::StartupFailed(format!("Failed to get current executable path: {}", e)))?;
+        let mut cmd = Command::new(&current_exe);
         cmd.arg("--start-daemon-self-detached")  // <-- main reason for this
             .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
             .stdin(Stdio::null())
