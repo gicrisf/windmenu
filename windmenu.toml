@@ -5,45 +5,31 @@
 # a Windows application launcher with a dmenu-like interface.
 
 # ===============================================================================
-# HOTKEY CONFIGURATION
+# DAEMON
 # ===============================================================================
-# Custom shortcut keys (default is WIN+SPACE if not specified)
-# Examples:
-# shortcut = ["WIN", "SPACE"]     # Default Win+Space
-# shortcut = ["CTRL", "ALT", "X"] # Ctrl+Alt+X
-# shortcut = ["ALT", "F2"]        # Alt+F2 (like GNOME)
-# shortcut = ["WIN", "R"]         # Win+R (like Windows Run dialog)
-# Uncomment and modify the line below to use a custom shortcut:
-# shortcut = ["CTRL", "ALT", "SPACE"]
 
-# ===============================================================================
-# DAEMON CONFIGURATION
-# ===============================================================================
-# Path to wlines-daemon.exe (defaults to same directory as windmenu.exe if not set)
-# This specifies where to find the wlines daemon executable
-# Example paths:
-# wlines_daemon_path = "C:\\Users\\Username\\path\\to\\wlines-daemon.exe"
-# wlines_daemon_path = "./wlines-daemon.exe"
+# Custom hotkey (default is ["WIN", "SPACE"])
+# Examples:
+# hotkey = ["CTRL", "ALT", "X"] # Ctrl+Alt+X
+# hotkey = ["ALT", "F2"]        # Alt+F2 (like GNOME)
+# hotkey = ["CTRL", "ALT", "SPACE"]
+
 # Uncomment and set the path below if using a custom wlines-daemon location:
-# wlines_daemon_path = "wlines-daemon.exe"
+# wlines_daemon_path = "C:\\Users\\Username\\path\\to\\wlines-daemon.exe"
+# wlines_daemon_path = "./some/other/path/wlines-daemon.exe"
 
 # Hotkey polling interval in milliseconds (default: 50)
-# How frequently windmenu checks for hotkey presses - lower values = more responsive but higher CPU usage
+# How frequently windmenu checks for hotkey presses
+# lower values = more responsive but higher CPU usage
 # hotkey_poll_interval = 50
 
-# ===============================================================================
-# WLINES FALLBACK CONFIGURATION
-# ===============================================================================
 # Path to wlines.exe for direct execution when daemon is not running
 # This provides fallback functionality if the wlines daemon is unavailable
-# Example paths:
 # wlines_cli_path = "C:\\Users\\Username\\path\\to\\wlines.exe"
 # wlines_cli_path = "./wlines.exe"
-# Uncomment and set the path below if you want to use direct wlines execution:
-# wlines_cli_path = "wlines.exe"
 
 # ===============================================================================
-# WLINES THEME CONFIGURATION
+# THEME
 # ===============================================================================
 # Configure the appearance of the WindMenu interface using descriptive field names.
 # This section automatically generates wlines-config.txt with the appropriate settings.
@@ -60,17 +46,8 @@ text_background_color = "#313244"   # Input field background color (Catppuccin M
 text_foreground_color = "#cdd6f4"   # Input field text color (Catppuccin Mocha text)
 font_name = "Consolas"              # Font family name (monospace recommended)
 font_size = 20                      # Font size in points
-prompt = "Catppuccin run :3"                     # Custom prompt text shown in input field
+prompt = "Run :"                    # Custom prompt text shown in input field
 filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
-
-# ===============================================================================
-# BUILT-IN SPECIAL COMMANDS
-# ===============================================================================
-# WindMenu includes special built-in commands that are always available:
-# - "Toggle Caps Lock" - Toggles the Caps Lock key state
-# - "WLAN Scan" - Triggers a WiFi network scan and displays available networks
-#
-# These commands appear automatically in the menu and don't need to be configured.
 
 # ===============================================================================
 # CUSTOM COMMANDS
@@ -80,129 +57,10 @@ filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
 # - args: Execute shell commands/programs
 # - keys: Send keyboard shortcuts
 
-# -------------------------------------------------------------------------------
-# Application Launch Commands
-# -------------------------------------------------------------------------------
-# Commands that launch applications or execute shell commands
-
 [[commands]]
 name = "Windows Terminal"
-args = ["wt"]
+args = ["wt"] # <-- Shell command
 
-[[commands]]
-name = "Emacs (via WSL)"
-args = ["wsl", "-d", "Ubuntu-22.04", "-e", "env", "DISPLAY=localhost:0.0", "emacs"]
-
-[[commands]]
-name = "System Beep"
-args = ["powershell", "[System.Media.SystemSounds]::Beep.Play()"]
-
-# -------------------------------------------------------------------------------
-# Keyboard Shortcuts
-# -------------------------------------------------------------------------------
-
-# Key combination commands for Windows Terminal management
-
-## Tab Management
-[[commands]]
-name = "WT Next Tab"
-keys = ["CTRL", "ALT", "RIGHT"]
-
-[[commands]]
-name = "WT Previous Tab"
-keys = ["CTRL", "ALT", "LEFT"]
-
-[[commands]]
-name = "WT Settings"
-keys = ["CTRL", "COMMA"]
-
-[[commands]]
-name = "WT New Tab"
-keys = ["CTRL", "SHIFT", "T"]
-
-## Font Size Control
-[[commands]]
-name = "WT Decrease Font Size"
-keys = ["CTRL", "-"]
-
-[[commands]]
-name = "WT Increase Font Size"
-keys = ["CTRL", "+"]
-
-[[commands]]
-name = "WT Reset Font Size"
-keys = ["CTRL", "0"]
-
-## Pane Management
-[[commands]]
-name = "WT Duplicate Pane"
-keys = ["ALT", "SHIFT", "D"]
-
-[[commands]]
-name = "WT Split Pane Down"
-keys = ["ALT", "SHIFT", "-"]
-
-[[commands]]
-name = "WT Split Pane Right"
-keys = ["ALT", "SHIFT", "+"]
-
-[[commands]]
-name = "WT Close Pane"
-keys = ["CTRL", "SHIFT", "W"]
-
-## Pane Navigation
-[[commands]]
-name = "WT Focus Up"
-keys = ["ALT", "UP"]
-
-[[commands]]
-name = "WT Focus Down"
-keys = ["ALT", "DOWN"]
-
-[[commands]]
-name = "WT Focus Left"
-keys = ["ALT", "LEFT"]
-
-[[commands]]
-name = "WT Focus Right"
-keys = ["ALT", "RIGHT"]
-
-# Pane Resizing
-[[commands]]
-name = "WT Resize Up"
-keys = ["ALT", "SHIFT", "UP"]
-
-[[commands]]
-name = "WT Resize Down"
-keys = ["ALT", "SHIFT", "DOWN"]
-
-[[commands]]
-name = "WT Resize Left"
-keys = ["ALT", "SHIFT", "LEFT"]
-
-[[commands]]
-name = "WT Resize Right"
-keys = ["ALT", "SHIFT", "RIGHT"]
-
-# Other Terminal Functions
-[[commands]]
-name = "WT Find"
-keys = ["CTRL", "SHIFT", "F"]
-
-[[commands]]
-name = "WT New Window"
-keys = ["CTRL", "SHIFT", "N"]
-
-[[commands]]
-name = "WT Toggle Mark Mode"
-keys = ["CTRL", "SHIFT", "M"]
-
-# Window Management
-[[commands]]
-name = "Maximize Window"
-keys = ["WIN", "UP"]
-
-# System Power Commands
 [[commands]]
 name = "Shutdown"
 args = ["shutdown.exe", "/s"]
@@ -218,3 +76,7 @@ args = ["shutdown.exe", "/l"]
 [[commands]]
 name = "Hibernate"
 args = ["shutdown.exe", "/h"]
+
+[[commands]]
+name = "Maximize Window"
+keys = ["WIN", "UP"] # <-- Keyboard shortcut
