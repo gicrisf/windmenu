@@ -124,24 +124,49 @@ enum FetchType {
     WlinesCli,
 }
 
+/// Find an executable on PATH using where.exe.
+/// Returns the first match, which for Scoop installs will be the stable shim path.
+fn find_on_path(exe_name: &str) -> Option<PathBuf> {
+    std::process::Command::new("where.exe")
+        .arg(exe_name)
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                stdout.lines().next().map(|line| PathBuf::from(line.trim()))
+            } else {
+                None
+            }
+        })
+}
+
 fn main() {
-    // Create daemon instances early - we'll use them throughout
     let current_exe = env::current_exe()
         .expect("Failed to get current executable path");
-    // Cli parsing
     let cli = Cli::parse();
 
+    // Resolve stable windmenu path: prefer PATH (Scoop shim) over resolved current_exe
+    let windmenu_path = find_on_path("windmenu.exe")
+        .unwrap_or_else(|| current_exe.clone());
+
+    // Resolve wlines-daemon path
     let wlines_daemon_path = if let Some(custom_path) = &cli.wlines_daemon_path {
         custom_path.clone()
     } else {
-        let install_dir = current_exe
-            .parent()
-            .expect("Failed to get installation directory");
+        let same_dir = current_exe.parent()
+            .expect("Failed to get installation directory")
+            .join("wlines-daemon.exe");
 
-        install_dir.join("wlines-daemon.exe")
+        if same_dir.exists() {
+            same_dir
+        } else {
+            find_on_path("wlines-daemon.exe")
+                .unwrap_or(same_dir) // fall back to same-dir path for error messaging
+        }
     };
 
-    let windmenu_daemon = WindmenuDaemon::new(&current_exe);
+    let windmenu_daemon = WindmenuDaemon::new(&windmenu_path);
     let wlines_daemon = WlinesDaemon::new(&wlines_daemon_path);
 
     if cli.start_daemon_self_detached {
