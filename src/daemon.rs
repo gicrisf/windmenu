@@ -79,12 +79,17 @@ pub trait Daemon {
             return Err(DaemonError::AlreadyRunning);
         }
 
-        let child = Command::new(self.path())
-            .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
+        let mut cmd = Command::new(self.path());
+        cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
+            .stderr(Stdio::null());
+
+        if let Some(dir) = self.working_directory() {
+            cmd.current_dir(dir);
+        }
+
+        let child = cmd.spawn()
             .map_err(|e| DaemonError::StartupFailed(
                 format!("Failed to start {} at '{}': {}",
                         self.name(),
@@ -242,8 +247,12 @@ pub trait Daemon {
 
         let startup_dir = Path::new(&startup_folder).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
         let script_path = startup_dir.join(self.user_script_name());
+        let working_dir = self.working_directory()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
         let vbs_content = format!(r#"Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run """{}""", 0, False"#, self.path_str());
+WshShell.CurrentDirectory = "{}"
+WshShell.Run """{}""", 0, False"#, working_dir, self.path_str());
 
         fs::write(&script_path, vbs_content)
             .map_err(|_| format!("Failed to create {} VBS startup script", self.name()))?;
@@ -310,8 +319,12 @@ WshShell.Run """{}""", 0, False"#, self.path_str());
 
         let startup_dir = Path::new(&startup_folder).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
         let script_path = startup_dir.join(self.all_users_script_name());
+        let working_dir = self.working_directory()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
         let vbs_content = format!(r#"Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run """{}""", 0, False"#, self.path_str());
+WshShell.CurrentDirectory = "{}"
+WshShell.Run """{}""", 0, False"#, working_dir, self.path_str());
 
         fs::write(&script_path, vbs_content)
             .map_err(|_| format!("Failed to create {} VBS startup script (admin privileges may be required)", self.name()))?;
@@ -412,13 +425,18 @@ impl Daemon for WindmenuDaemon {
         //     .map_err(|e| DaemonError::StartupFailed(format!("Failed to get current executable path: {}", e)))?;
         // I used current exe before:
         // let child = Command::new(&current_exe)
-        let child = Command::new(self.path())
-            .arg("--start-daemon-self-detached")  // <-- main reason for this
+        let mut cmd = Command::new(self.path());
+        cmd.arg("--start-daemon-self-detached")  // <-- main reason for this
             .creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
+            .stderr(Stdio::null());
+
+        if let Some(dir) = self.working_directory() {
+            cmd.current_dir(dir);
+        }
+
+        let child = cmd.spawn()
             .map_err(|e| DaemonError::StartupFailed(
                 format!("Failed to start {} at '{}': {}",
                         self.name(),

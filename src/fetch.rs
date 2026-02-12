@@ -30,13 +30,17 @@ impl std::fmt::Display for FetchError {
 impl std::error::Error for FetchError {}
 
 fn download_binary(url: &str, filename: &str) -> Result<PathBuf, FetchError> {
-    let file_path = PathBuf::from(filename);
+    let base_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."));
+    let file_path = base_dir.join(filename);
 
     if file_path.exists() {
         return Ok(file_path);
     }
 
-    println!("{} not found in root directory, downloading...", filename);
+    println!("{} not found in executable directory, downloading...", filename);
     println!("Downloading from: {}", url);
 
     // Use PowerShell to download
