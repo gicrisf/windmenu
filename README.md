@@ -21,7 +21,9 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 iex "& {$(irm https://raw.githubusercontent.com/gicrisf/windmenu/main/install.ps1)}"
 ```
 
-This downloads the latest release to `$HOME\.windmenu`, optionally adds it to your PATH, and starts the daemons. No admin required.
+This downloads the latest release to `$HOME\.windmenu`, optionally adds it to your PATH, and prints next steps. No admin required.
+
+> **Note**: Windows Defender may flag `iex` (Invoke-Expression) as suspicious. If that happens, you can download and review `install.ps1` manually before running it.
 
 ### Option 2: Scoop
 
