@@ -27,12 +27,10 @@ This downloads the latest release to `$HOME\.windmenu`, optionally adds it to yo
 
 ### Option 2: Scoop
 
-```powershell
+```
 scoop bucket add gicrisf https://github.com/gicrisf/bucket
 scoop install windmenu
 ```
-
-Then start the daemons: `windmenu daemon all start`
 
 ### Option 3: Direct Download
 
@@ -56,12 +54,12 @@ To customize the hotkey or add your own commands, edit `windmenu.toml` in the sa
 
 ```toml
 # Change the hotkey
-shortcut = ["WIN", "SPACE"]  # Default
+hotkey = ["WIN", "SPACE"]  # Default
 
 # If you use multiple keyboard layouts, try one of these instead:
-# shortcut = ["WIN", "R"]
-# shortcut = ["ALT", "SPACE"]
-# shortcut = ["CTRL", "SPACE"]
+# hotkey = ["WIN", "R"]
+# hotkey = ["ALT", "SPACE"]
+# hotkey = ["CTRL", "SPACE"]
 ```
 
 **Note on the default hotkey**: `Win+Space` is Windows' language switcher shortcut. If you only use one keyboard layout (like US English), this won't matter - the conflict is harmless. But if you switch between multiple languages, you'll want to change the hotkey to something else.
@@ -101,31 +99,6 @@ Implementation uses Windows `SendInput` API with proper key sequencing (press al
 ### 3. Special Commands (always active)
 
 These are built-in commands that are always available, primarily useful for edge cases. For example, the Caps Lock toggle command is handy if you've remapped your physical Caps Lock key to something else but occasionally need to actually toggle caps lock state.
-
-## Build
-
-Build all components:
-
-```bash
-cargo build --release
-```
-
-## Uninstallation
-
-First, stop the daemons and remove auto-startup entries, otherwise the system will try to launch something that no longer exists at the next startup:
-
-```powershell
-windmenu daemon all stop
-windmenu daemon all disable
-```
-
-If installed via Scoop:
-
-```powershell
-scoop uninstall windmenu
-```
-
-For script or manual installs, delete the install directory. The application is fully portable (all binaries and configuration reside within it, so no traces are left elsewhere).
 
 ## Key Combination Commands
 
@@ -212,6 +185,37 @@ keys = ["WIN", "CTRL", "1"]
 
 The menu will display both types of commands and execute them appropriately based on their configuration.
 
+## Build
+
+Build all components:
+
+```bash
+cargo build --release
+```
+
+## Uninstallation
+
+First, stop the daemons and remove auto-startup entries, otherwise the system will try to launch something that no longer exists at the next startup:
+
+```powershell
+windmenu daemon all stop
+windmenu daemon all disable
+```
+
+Check the situation with
+
+``` powershell
+windmenu daemon all status
+```
+
+If no instance is running and no startup configuration is still enabled, proceed by removing the binaries. If installed via Scoop:
+
+```powershell
+scoop uninstall windmenu
+```
+
+For other installations, delete the installation directory (`$HOME\.windmenu` if you used the script). The application is fully portable (all binaries and configuration reside within it, so no traces are left elsewhere).
+
 ## Troubleshooting
 
 ### Auto-startup with Task Scheduler requires elevated privileges
@@ -232,6 +236,14 @@ If you installed via Scoop and enabled auto-startup with the `registry` method, 
 windmenu daemon all disable
 windmenu daemon all enable user-folder
 ```
+
+### Configuration not being read
+
+If windmenu doesn't seem to pick up your configuration changes, it may be reading `windmenu.toml` from a different location than you expect. Run `windmenu test config` to see which config file is being loaded and what values it contains.
+
+### Windows Store apps not appearing in the menu
+
+Windmenu discovers Windows Store apps by detecting reparse points in the Start Menu directories. If some apps are missing, run `windmenu test reparse-points` to verify that reparse point detection is working correctly on your system.
 
 ## Acknowledgments
 
