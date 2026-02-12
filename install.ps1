@@ -90,6 +90,6 @@ Write-Host ""
 Write-Host "Then press Win+Space to launch the menu." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Optional:" -ForegroundColor Cyan
-Write-Host "  windmenu daemon all enable task    # auto-start on login" -ForegroundColor White
+Write-Host "  windmenu daemon all enable user-folder # auto-start on login" -ForegroundColor White
 Write-Host "  notepad $InstallDir\windmenu.toml  # customize hotkey and commands" -ForegroundColor White
 Write-Host ""
