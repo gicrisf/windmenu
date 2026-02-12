@@ -13,38 +13,40 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 - Background daemon with named pipe communication
 - Configurable appearance and behavior (thanks to JerwuQu's work on the original version of [wlines](https://github.com/gicrisf/wlines))
 
+## Installation
 
-## Quickstart
+### Option 1: PowerShell Script
 
-### Option 1: Scoop (Recommended)
+```powershell
+iex "& {$(irm https://raw.githubusercontent.com/gicrisf/windmenu/main/install.ps1)}"
+```
+
+This downloads the latest release to `$HOME\.windmenu`, optionally adds it to your PATH, and starts the daemons. No admin required.
+
+### Option 2: Scoop
 
 ```powershell
 scoop bucket add gicrisf https://github.com/gicrisf/bucket
 scoop install windmenu
 ```
 
-Then set up the daemons:
+Then start the daemons: `windmenu daemon all start`
 
-```powershell
-windmenu daemon all start
+### Option 3: Direct Download
 
-# Optional: enable auto-startup. Learn how through:
-# windmenu daemon all enable --help
-```
-
-### Option 2: Portable ZIP
-
-Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and set up via CLI:
-
-```powershell
-.\windmenu.exe fetch wlines-daemon
-.\windmenu.exe daemon all start
-
-# Optional: enable auto-startup. Learn how through:
-# .\windmenu.exe daemon all enable --help
-```
+Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe daemon all start`.
 
 Press `Win+Space` to launch.
+
+### Auto-Startup
+
+To have windmenu start automatically when you log in:
+
+```powershell
+windmenu daemon all enable task
+```
+
+For Scoop installs, use `task` or `user-folder` methods to avoid a brief terminal flash caused by the Scoop shim. See all available methods with `windmenu daemon all enable --help`.
 
 ### Customizing the Hotkey
 
@@ -106,17 +108,22 @@ Build all components:
 cargo build --release
 ```
 
-
 ## Uninstallation
 
-If installed via Scoop:
+First, stop the daemons and remove auto-startup entries, otherwise the system will try to launch something that no longer exists at the next startup:
+
 ```powershell
 windmenu daemon all stop
 windmenu daemon all disable
+```
+
+If installed via Scoop:
+
+```powershell
 scoop uninstall windmenu
 ```
 
-For portable installs, stop the daemons and delete the directory. The application is fully portable — all binaries and configuration reside within the install directory, so no traces are left elsewhere. Auto-startup entries (Registry, Task Scheduler, or Startup folder) can be cleaned up with `windmenu daemon all disable` before removing the files.
+For script or manual installs, delete the install directory. The application is fully portable (all binaries and configuration reside within it, so no traces are left elsewhere).
 
 ## Key Combination Commands
 
@@ -202,6 +209,27 @@ keys = ["WIN", "CTRL", "1"]
 ```
 
 The menu will display both types of commands and execute them appropriately based on their configuration.
+
+## Troubleshooting
+
+### Auto-startup with Task Scheduler requires elevated privileges
+
+The `task` method uses `schtasks.exe`, which may fail if your account lacks permission to create scheduled tasks. If you get an access denied error, try `user-folder` instead:
+
+```powershell
+windmenu daemon all enable user-folder
+```
+
+This places a VBS wrapper in your Startup folder and requires no special privileges.
+
+### Brief terminal flash on startup with Scoop
+
+If you installed via Scoop and enabled auto-startup with the `registry` method, you may see a console window flash briefly when Windows launches the Scoop shim. Switch to `task` or `user-folder` to avoid this:
+
+```powershell
+windmenu daemon all disable
+windmenu daemon all enable user-folder
+```
 
 ## Acknowledgments
 
