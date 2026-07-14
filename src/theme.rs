@@ -1,73 +1,71 @@
 use serde::Deserialize;
-use std::fs;
-use std::path::Path;
+
+use crate::wlines::{self, FilterMode, Settings};
 
 #[derive(Debug, Deserialize)]
 pub struct WlinesTheme {
-    pub lines: Option<usize>,                    // Lines to show (-l)
-    pub prompt: Option<String>,                  // Prompt text (-p)
-    pub filter_mode: Option<String>,             // Filter mode (-fm)
-    pub selected_index: Option<usize>,           // Selected index (-si)
-    pub padding_x: Option<usize>,                // Window padding (-px)
-    pub width_x: Option<usize>,                  // Window width (-wx)
-    pub background_color: Option<String>,        // Background color (-bg)
-    pub foreground_color: Option<String>,        // Foreground color (-fg)
-    pub selected_background_color: Option<String>, // Selected bg color (-sbg)
-    pub selected_foreground_color: Option<String>, // Selected fg color (-sfg)
-    pub text_background_color: Option<String>,   // Text input bg (-tbg)
-    pub text_foreground_color: Option<String>,   // Text input fg (-tfg)
-    pub font_name: Option<String>,               // Font name (-f)
-    pub font_size: Option<usize>,                // Font size (-fs)
+    pub lines: Option<usize>,                    // Lines to show
+    pub prompt: Option<String>,                  // Prompt text
+    pub filter_mode: Option<String>,             // Filter mode (complete/keywords)
+    pub selected_index: Option<usize>,           // Initial selected index
+    pub padding_x: Option<usize>,                // Window padding
+    pub width_x: Option<usize>,                  // Window width (centers the window)
+    pub background_color: Option<String>,        // Background color
+    pub foreground_color: Option<String>,        // Foreground color
+    pub selected_background_color: Option<String>, // Selected bg color
+    pub selected_foreground_color: Option<String>, // Selected fg color
+    pub text_background_color: Option<String>,   // Text input bg
+    pub text_foreground_color: Option<String>,   // Text input fg
+    pub font_name: Option<String>,               // Font name
+    pub font_size: Option<usize>,                // Font size
+}
+
+fn apply_color(target: &mut u32, color: &Option<String>, name: &str) {
+    if let Some(value) = color {
+        match wlines::parse_color(value) {
+            Some(parsed) => *target = parsed,
+            None => eprintln!("Warning: invalid {} '{}', using default", name, value),
+        }
+    }
 }
 
 impl WlinesTheme {
-    pub fn to_args(&self) -> Vec<String> {
-        let mut args = Vec::new();
+    /// Convert the theme into renderer settings, keeping renderer defaults
+    /// for any unset field.
+    pub fn to_settings(&self) -> Settings {
+        let mut settings = Settings::default();
 
         if let Some(lines) = self.lines {
-            args.extend(["-l".to_string(), lines.to_string()]);
+            settings.line_count = lines;
         }
-        if let Some(prompt) = &self.prompt {
-            args.extend(["-p".to_string(), prompt.clone()]);
-        }
-        if let Some(filter_mode) = &self.filter_mode {
-            args.extend(["-fm".to_string(), filter_mode.clone()]);
+        settings.prompt = self.prompt.clone();
+        if let Some(ref filter_mode) = self.filter_mode {
+            settings.filter_mode = FilterMode::parse(filter_mode);
         }
         if let Some(selected_index) = self.selected_index {
-            args.extend(["-si".to_string(), selected_index.to_string()]);
+            settings.initial_index = selected_index;
         }
         if let Some(padding_x) = self.padding_x {
-            args.extend(["-px".to_string(), padding_x.to_string()]);
+            settings.padding = padding_x as i32;
         }
         if let Some(width_x) = self.width_x {
-            args.extend(["-wx".to_string(), width_x.to_string()]);
+            settings.width = width_x as i32;
+            settings.center_window = true;
         }
-        if let Some(background_color) = &self.background_color {
-            args.extend(["-bg".to_string(), background_color.clone()]);
-        }
-        if let Some(foreground_color) = &self.foreground_color {
-            args.extend(["-fg".to_string(), foreground_color.clone()]);
-        }
-        if let Some(selected_background_color) = &self.selected_background_color {
-            args.extend(["-sbg".to_string(), selected_background_color.clone()]);
-        }
-        if let Some(selected_foreground_color) = &self.selected_foreground_color {
-            args.extend(["-sfg".to_string(), selected_foreground_color.clone()]);
-        }
-        if let Some(text_background_color) = &self.text_background_color {
-            args.extend(["-tbg".to_string(), text_background_color.clone()]);
-        }
-        if let Some(text_foreground_color) = &self.text_foreground_color {
-            args.extend(["-tfg".to_string(), text_foreground_color.clone()]);
-        }
-        if let Some(font_name) = &self.font_name {
-            args.extend(["-f".to_string(), font_name.clone()]);
+        apply_color(&mut settings.bg, &self.background_color, "background_color");
+        apply_color(&mut settings.fg, &self.foreground_color, "foreground_color");
+        apply_color(&mut settings.bg_select, &self.selected_background_color, "selected_background_color");
+        apply_color(&mut settings.fg_select, &self.selected_foreground_color, "selected_foreground_color");
+        apply_color(&mut settings.bg_edit, &self.text_background_color, "text_background_color");
+        apply_color(&mut settings.fg_edit, &self.text_foreground_color, "text_foreground_color");
+        if let Some(ref font_name) = self.font_name {
+            settings.font_name = font_name.clone();
         }
         if let Some(font_size) = self.font_size {
-            args.extend(["-fs".to_string(), font_size.to_string()]);
+            settings.font_size = font_size as i32;
         }
 
-        args
+        settings
     }
 
     pub fn default() -> Self {
@@ -87,75 +85,5 @@ impl WlinesTheme {
             font_name: Some("Consolas".to_string()),
             font_size: Some(18),
         }
-    }
-
-    pub fn generate_wlines_config(config_path: &Path, theme: Option<&WlinesTheme>) -> std::io::Result<()> {
-        let default_theme = WlinesTheme::default();
-        let theme = theme.unwrap_or(&default_theme);
-
-        let mut config_content = String::new();
-        config_content.push_str("# Wlines Configuration\n");
-        config_content.push_str("# Generated by windmenu\n");
-        config_content.push_str("#\n");
-        config_content.push_str("# This file contains startup arguments for the wlines daemon.\n");
-        config_content.push_str("# It is recommended to use windmenu\n");
-        config_content.push_str("# instead of directly editing this file.\n");
-        config_content.push_str("#\n");
-        config_content.push_str("# If you manually edit this file, restart the wlines daemon to apply changes.\n\n");
-
-        config_content.push_str("# Appearance settings\n");
-        if let Some(background_color) = &theme.background_color {
-            config_content.push_str(&format!("-bg {}\n", background_color));
-        }
-        if let Some(foreground_color) = &theme.foreground_color {
-            config_content.push_str(&format!("-fg {}\n", foreground_color));
-        }
-        if let Some(selected_background_color) = &theme.selected_background_color {
-            config_content.push_str(&format!("-sbg {}\n", selected_background_color));
-        }
-        if let Some(selected_foreground_color) = &theme.selected_foreground_color {
-            config_content.push_str(&format!("-sfg {}\n", selected_foreground_color));
-        }
-        if let Some(text_background_color) = &theme.text_background_color {
-            config_content.push_str(&format!("-tbg {}\n", text_background_color));
-        }
-        if let Some(text_foreground_color) = &theme.text_foreground_color {
-            config_content.push_str(&format!("-tfg {}\n", text_foreground_color));
-        }
-
-        config_content.push_str("\n# Font settings\n");
-        if let Some(font_name) = &theme.font_name {
-            config_content.push_str(&format!("-f {}\n", font_name));
-        }
-        if let Some(font_size) = theme.font_size {
-            config_content.push_str(&format!("-fs {}\n", font_size));
-        }
-
-        config_content.push_str("\n# Window settings\n");
-        if let Some(lines) = theme.lines {
-            config_content.push_str(&format!("-l {}\n", lines));
-        }
-        if let Some(padding_x) = theme.padding_x {
-            config_content.push_str(&format!("-px {}\n", padding_x));
-        }
-        if let Some(width_x) = theme.width_x {
-            config_content.push_str(&format!("-wx {}\n", width_x));
-        }
-
-        if let Some(prompt) = &theme.prompt {
-            config_content.push_str(&format!("-p {}\n", prompt));
-        }
-        if let Some(filter_mode) = &theme.filter_mode {
-            config_content.push_str(&format!("-fm {}\n", filter_mode));
-        }
-        if let Some(selected_index) = theme.selected_index {
-            config_content.push_str(&format!("-si {}\n", selected_index));
-        }
-
-        config_content.push_str("\n# Other settings\n");
-        config_content.push_str("# -cs    # Uncomment for case-sensitive search\n");
-        config_content.push_str("# -id    # Uncomment to output index instead of text\n");
-
-        fs::write(config_path, config_content)
     }
 }

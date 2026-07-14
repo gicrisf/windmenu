@@ -14,25 +14,16 @@
 # hotkey = ["ALT", "F2"]        # Alt+F2 (like GNOME)
 # hotkey = ["CTRL", "ALT", "SPACE"]
 
-# Uncomment and set the path below if using a custom wlines-daemon location:
-# wlines_daemon_path = "C:\\Users\\Username\\path\\to\\wlines-daemon.exe"
-# wlines_daemon_path = "./some/other/path/wlines-daemon.exe"
-
 # Hotkey polling interval in milliseconds (default: 50)
 # How frequently windmenu checks for hotkey presses
 # lower values = more responsive but higher CPU usage
 # hotkey_poll_interval = 50
 
-# Path to wlines.exe for direct execution when daemon is not running
-# This provides fallback functionality if the wlines daemon is unavailable
-# wlines_cli_path = "C:\\Users\\Username\\path\\to\\wlines.exe"
-# wlines_cli_path = "./wlines.exe"
-
 # ===============================================================================
 # THEME
 # ===============================================================================
 # Configure the appearance of the WindMenu interface using descriptive field names.
-# This section automatically generates wlines-config.txt with the appropriate settings.
+# The menu renderer is built into windmenu; changes apply on daemon restart.
 
 [theme]
 lines = 12                          # Number of menu items to display
@@ -47,7 +38,7 @@ text_foreground_color = "#cdd6f4"   # Input field text color (Catppuccin Mocha t
 font_name = "Consolas"              # Font family name (monospace recommended)
 font_size = 20                      # Font size in points
 prompt = "Run :"                    # Custom prompt text shown in input field
-filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
+filter_mode = "keywords"            # Search mode: "complete" (whole query as substring) or "keywords" (each word must match)
 
 # ===============================================================================
 # CUSTOM COMMANDS

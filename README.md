@@ -10,8 +10,8 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 - Scans Windows Start Menu shortcuts automatically
 - Supports custom commands via configuration
 - Key combination commands - trigger keyboard shortcuts from the menu
-- Background daemon with named pipe communication
-- Configurable appearance and behavior (thanks to JerwuQu's work on the original version of [wlines](https://github.com/gicrisf/wlines))
+- Single self-contained executable - the menu renderer is built in
+- Configurable appearance and behavior (thanks to JerwuQu's work on the original version of [wlines](https://github.com/gicrisf/wlines), which the built-in renderer is ported from)
 
 ## Installation
 
@@ -34,7 +34,7 @@ scoop install windmenu
 
 ### Option 3: Direct Download
 
-Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe daemon all start`.
+Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe daemon self start`.
 
 Press `Win+Space` to launch.
 
@@ -43,10 +43,10 @@ Press `Win+Space` to launch.
 To have windmenu start automatically when you log in:
 
 ```powershell
-windmenu daemon all enable task
+windmenu daemon self enable task
 ```
 
-For Scoop installs, use `task` or `user-folder` methods to avoid a brief terminal flash caused by the Scoop shim. See all available methods with `windmenu daemon all enable --help`.
+For Scoop installs, use `task` or `user-folder` methods to avoid a brief terminal flash caused by the Scoop shim. See all available methods with `windmenu daemon self enable --help`.
 
 ### Customizing the Hotkey
 
@@ -195,17 +195,17 @@ cargo build --release
 
 ## Uninstallation
 
-First, stop the daemons and remove auto-startup entries, otherwise the system will try to launch something that no longer exists at the next startup:
+First, stop the daemon and remove auto-startup entries, otherwise the system will try to launch something that no longer exists at the next startup:
 
 ```powershell
-windmenu daemon all stop
-windmenu daemon all disable
+windmenu daemon self stop
+windmenu daemon self disable
 ```
 
 Check the situation with
 
 ``` powershell
-windmenu daemon all status
+windmenu daemon self status
 ```
 
 If no instance is running and no startup configuration is still enabled, proceed by removing the binaries. If installed via Scoop:
@@ -216,6 +216,14 @@ scoop uninstall windmenu
 
 For other installations, delete the installation directory (`$HOME\.windmenu` if you used the script). The application is fully portable (all binaries and configuration reside within it, so no traces are left elsewhere).
 
+## Upgrading from 0.5.x
+
+Since 0.6.0 the menu renderer is built into `windmenu.exe`; the separate `wlines-daemon.exe` process, the named pipe, and the `wlines.exe` fallback are gone. After upgrading:
+
+1. Remove any auto-start entries for the old wlines daemon (with the **old** binary: `windmenu daemon wlines disable <method>`, or delete them manually from `HKCU\...\Run` / Task Scheduler / the Startup folder).
+2. Stop and delete any leftover `wlines-daemon.exe`.
+3. The `wlines_daemon_path` / `wlines_cli_path` config keys and the generated `wlines-config.txt` file are no longer used; the `windmenu fetch` and `windmenu daemon wlines|all` commands were removed (use `windmenu daemon self ...`).
+
 ## Troubleshooting
 
 ### Auto-startup with Task Scheduler requires elevated privileges
@@ -223,7 +231,7 @@ For other installations, delete the installation directory (`$HOME\.windmenu` if
 The `task` method uses `schtasks.exe`, which may fail if your account lacks permission to create scheduled tasks. If you get an access denied error, try `user-folder` instead:
 
 ```powershell
-windmenu daemon all enable user-folder
+windmenu daemon self enable user-folder
 ```
 
 This places a VBS wrapper in your Startup folder and requires no special privileges.
@@ -233,8 +241,8 @@ This places a VBS wrapper in your Startup folder and requires no special privile
 If you installed via Scoop and enabled auto-startup with the `registry` method, you may see a console window flash briefly when Windows launches the Scoop shim. Switch to `task` or `user-folder` to avoid this:
 
 ```powershell
-windmenu daemon all disable
-windmenu daemon all enable user-folder
+windmenu daemon self disable
+windmenu daemon self enable user-folder
 ```
 
 ### Configuration not being read
@@ -249,6 +257,6 @@ Windmenu discovers Windows Store apps by detecting reparse points in the Start M
 
 WindMenu wouldn't be possible without the contributions of others:
 
-- **[wlines](https://github.com/gicrisf/wlines)** - The excellent menu rendering engine that powers WindMenu's interface. Special thanks to [JerwuQu](https://github.com/JerwuQu/wlines) for the original implementation.
+- **[wlines](https://github.com/gicrisf/wlines)** - The excellent menu rendering engine that WindMenu's built-in renderer is ported from. Special thanks to [JerwuQu](https://github.com/JerwuQu/wlines) for the original implementation.
 - **[dmenu](https://tools.suckless.org/dmenu/)** - The original inspiration for this project. WindMenu aims to bring dmenu's philosophy and efficiency to Windows.
 - **[winapi-rs](https://github.com/retep998/winapi-rs)** maintainers - For providing comprehensive Rust bindings to the Windows API, making native Windows development in Rust possible.

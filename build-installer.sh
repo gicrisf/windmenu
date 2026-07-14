@@ -33,39 +33,6 @@ if [ ! -f "target/release/windmenu.exe" ]; then
 fi
 
 
-if [ ! -f "assets/wlines-daemon.exe" ]; then
-    echo -e "\033[0;33mwlines-daemon.exe not found in assets/, downloading...\033[0m"
-    
-    # Create assets directory if it doesn't exist
-    if [ ! -d "assets" ]; then
-        mkdir -p assets
-        echo -e "\033[0;32mCreated assets/ directory\033[0m"
-    fi
-    
-    url="https://github.com/gicrisf/wlines/releases/download/v0.1.0/wlines-daemon.exe"
-    output="assets/wlines-daemon.exe"
-    
-    echo -e "\033[0;36mDownloading from: $url\033[0m"
-    
-    if command -v wget &> /dev/null; then
-        wget -O "$output" "$url"
-    elif command -v curl &> /dev/null; then
-        curl -L -o "$output" "$url"
-    else
-        echo -e "\033[0;31mError: Neither wget nor curl found. Please install one of them.\033[0m"
-        exit 1
-    fi
-    
-    if [ -f "$output" ]; then
-        echo -e "\033[0;32mSuccessfully downloaded wlines-daemon.exe\033[0m"
-    else
-        echo -e "\033[0;31mError: Failed to download wlines-daemon.exe\033[0m"
-        echo -e "\033[0;33mPlease download it manually from: $url\033[0m"
-        echo -e "\033[0;33mand place it in the assets/ directory\033[0m"
-        exit 1
-    fi
-fi
-
 # Create the installer
 echo -e "\033[0;33mCreating installer...\033[0m"
 makensis installer.nsi

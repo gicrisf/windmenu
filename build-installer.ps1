@@ -29,36 +29,6 @@ if (-not (Test-Path "target\release\windmenu.exe")) {
 }
 
 
-if (-not (Test-Path "assets\wlines-daemon.exe")) {
-    Write-Host "wlines-daemon.exe not found in assets\, downloading..." -ForegroundColor Yellow
-    
-    # Create assets directory if it doesn't exist
-    if (-not (Test-Path "assets")) {
-        New-Item -ItemType Directory -Path "assets" | Out-Null
-        Write-Host "Created assets\ directory" -ForegroundColor Green
-    }
-    
-    try {
-        $url = "https://github.com/gicrisf/wlines/releases/download/v0.1.0/wlines-daemon.exe"
-        $output = "assets\wlines-daemon.exe"
-        
-        Write-Host "Downloading from: $url" -ForegroundColor Cyan
-        Invoke-WebRequest -Uri $url -OutFile $output -UseBasicParsing
-        
-        if (Test-Path $output) {
-            Write-Host "Successfully downloaded wlines-daemon.exe" -ForegroundColor Green
-        } else {
-            throw "Download completed but file not found"
-        }
-    } catch {
-        Write-Host "Error: Failed to download wlines-daemon.exe" -ForegroundColor Red
-        Write-Host "Please download it manually from: $url" -ForegroundColor Yellow
-        Write-Host "and place it in the assets\ directory" -ForegroundColor Yellow
-        Read-Host "Press Enter to exit"
-        exit 1
-    }
-}
-
 # Create the installer
 Write-Host "Creating installer..." -ForegroundColor Yellow
 & makensis installer.nsi

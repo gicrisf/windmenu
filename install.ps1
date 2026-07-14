@@ -84,12 +84,11 @@ Write-Host ""
 Write-Host "windmenu $tag installed to $InstallDir" -ForegroundColor Green
 Write-Host ""
 Write-Host "To get started, run:" -ForegroundColor Cyan
-Write-Host "  windmenu fetch wlines-daemon" -ForegroundColor White
-Write-Host "  windmenu daemon all start" -ForegroundColor White
+Write-Host "  windmenu daemon self start" -ForegroundColor White
 Write-Host ""
 Write-Host "Then press Win+Space to launch the menu." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Optional:" -ForegroundColor Cyan
-Write-Host "  windmenu daemon all enable user-folder # auto-start on login" -ForegroundColor White
+Write-Host "  windmenu daemon self enable user-folder # auto-start on login" -ForegroundColor White
 Write-Host "  notepad $InstallDir\windmenu.toml  # customize hotkey and commands" -ForegroundColor White
 Write-Host ""

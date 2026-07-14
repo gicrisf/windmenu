@@ -9,27 +9,23 @@ mod task;
 mod daemon;
 mod proc;
 mod menu;
-mod fetch;
 mod theme;
 mod wlan;
+mod wlines;
 
-use daemon::{Daemon, DaemonError, StartupMethod, WlinesDaemon, WindmenuDaemon};
+use daemon::{Daemon, DaemonError, StartupMethod, WindmenuDaemon};
 use apps::print_reparse_points_info;
 use wlan::{print_wlan_interfaces_info, test_wlan_scan};
 use menu::Menu;
 
 #[derive(Parser)]
 #[command(name = "windmenu")]
-#[command(version = "0.5.0")]
-#[command(about = "WINdows DMENU-like launcher wrapper")]
+#[command(version = "0.6.0")]
+#[command(about = "WINdows DMENU-like launcher")]
 struct Cli {
     /// Run as background daemon process (internal)
     #[arg(long, hide = true)]
     start_daemon_self_detached: bool,
-
-    /// Path to wlines-daemon.exe (optional, defaults to same directory as windmenu.exe)
-    #[arg(long, value_name = "PATH")]
-    wlines_daemon_path: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -47,11 +43,6 @@ enum Commands {
         #[command(subcommand)]
         test_type: TestType,
     },
-    /// Download dependencies
-    Fetch {
-        #[command(subcommand)]
-        fetch_type: FetchType,
-    },
 }
 
 #[derive(Subcommand)]
@@ -59,16 +50,6 @@ enum DaemonType {
     /// Windmenu daemon operations
     #[command(name = "self")]
     Self_ {
-        #[command(subcommand)]
-        action: DaemonAction,
-    },
-    /// Wlines daemon operations
-    Wlines {
-        #[command(subcommand)]
-        action: DaemonAction,
-    },
-    /// Apply action to all daemons (windmenu and wlines)
-    All {
         #[command(subcommand)]
         action: DaemonAction,
     },
@@ -114,16 +95,6 @@ enum TestType {
     Config,
 }
 
-#[derive(Subcommand)]
-enum FetchType {
-    /// Download wlines-daemon.exe
-    #[command(name = "wlines-daemon")]
-    WlinesDaemon,
-    /// Download wlines.exe
-    #[command(name = "wlines-cli")]
-    WlinesCli,
-}
-
 /// Find an executable on PATH using where.exe.
 /// Returns the first match, which for Scoop installs will be the stable shim path.
 fn find_on_path(exe_name: &str) -> Option<PathBuf> {
@@ -150,40 +121,20 @@ fn main() {
     let windmenu_path = find_on_path("windmenu.exe")
         .unwrap_or_else(|| current_exe.clone());
 
-    // Resolve wlines-daemon path
-    let wlines_daemon_path = if let Some(custom_path) = &cli.wlines_daemon_path {
-        custom_path.clone()
-    } else {
-        let same_dir = current_exe.parent()
-            .expect("Failed to get installation directory")
-            .join("wlines-daemon.exe");
-
-        if same_dir.exists() {
-            same_dir
-        } else {
-            find_on_path("wlines-daemon.exe")
-                .unwrap_or(same_dir) // fall back to same-dir path for error messaging
-        }
-    };
-
     let windmenu_daemon = WindmenuDaemon::new(&windmenu_path);
-    let wlines_daemon = WlinesDaemon::new(&wlines_daemon_path);
 
     if cli.start_daemon_self_detached {
         // This is the background daemon process
-        start_daemon_self_detached(&wlines_daemon);
+        start_daemon_self_detached();
         return;
     }
 
     match cli.command {
         Some(Commands::Daemon { daemon_type }) => {
-            handle_daemon_command(daemon_type, &windmenu_daemon, &wlines_daemon);
+            handle_daemon_command(daemon_type, &windmenu_daemon);
         }
         Some(Commands::Test { test_type }) => {
             handle_test_command(test_type);
-        }
-        Some(Commands::Fetch { fetch_type }) => {
-            handle_fetch_command(fetch_type);
         }
         None => {
             // Default behavior - start windmenu daemon
@@ -205,165 +156,10 @@ fn main() {
     }
 }
 
-fn handle_daemon_command(daemon_type: DaemonType, windmenu_daemon: &WindmenuDaemon, wlines_daemon: &WlinesDaemon) {
+fn handle_daemon_command(daemon_type: DaemonType, windmenu_daemon: &WindmenuDaemon) {
     match daemon_type {
         DaemonType::Self_ { action } => {
             handle_daemon_action(action, windmenu_daemon, "windmenu");
-        }
-        DaemonType::Wlines { action } => {
-            handle_daemon_action(action, wlines_daemon, "wlines");
-        }
-        DaemonType::All { action } => {
-            handle_all_daemon_action(action, windmenu_daemon, wlines_daemon);
-        }
-    }
-}
-
-fn handle_all_daemon_action(action: DaemonAction, windmenu_daemon: &WindmenuDaemon, wlines_daemon: &WlinesDaemon) {
-    match action {
-        DaemonAction::Start => {
-            println!("Starting all daemons...");
-
-            // Start windmenu first
-            match windmenu_daemon.start() {
-                Ok(()) => {
-                    println!("✓ windmenu daemon started successfully");
-                }
-                Err(DaemonError::AlreadyRunning) => {
-                    println!("✓ windmenu daemon is already running");
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to start windmenu daemon: {}", err);
-                }
-            }
-
-            // Then start wlines
-            match wlines_daemon.start() {
-                Ok(()) => {
-                    println!("✓ wlines daemon started successfully");
-                }
-                Err(DaemonError::AlreadyRunning) => {
-                    println!("✓ wlines daemon is already running");
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to start wlines daemon: {}", err);
-                }
-            }
-
-            println!("Press Win+Space to activate menu");
-        }
-        DaemonAction::Stop => {
-            println!("Stopping all daemons...");
-
-            // Stop windmenu first
-            match windmenu_daemon.stop() {
-                Ok(()) => {
-                    println!("✓ windmenu daemon stopped successfully");
-                }
-                Err(DaemonError::NotRunning) => {
-                    println!("✓ windmenu daemon was not running");
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to stop windmenu daemon: {}", err);
-                }
-            }
-
-            // Then stop wlines
-            match wlines_daemon.stop() {
-                Ok(()) => {
-                    println!("✓ wlines daemon stopped successfully");
-                }
-                Err(DaemonError::NotRunning) => {
-                    println!("✓ wlines daemon was not running");
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to stop wlines daemon: {}", err);
-                }
-            }
-        }
-        DaemonAction::Restart => {
-            println!("Restarting all daemons...");
-
-            // Restart windmenu first
-            match windmenu_daemon.restart() {
-                Ok(()) => {
-                    println!("✓ windmenu daemon restarted successfully");
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to restart windmenu daemon: {}", err);
-                }
-            }
-
-            // Then restart wlines
-            match wlines_daemon.restart() {
-                Ok(()) => {
-                    println!("✓ wlines daemon restarted successfully");
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to restart wlines daemon: {}", err);
-                }
-            }
-
-            println!("Press Win+Space to activate menu");
-        }
-        DaemonAction::Status => {
-            println!("Status of all daemons:");
-            println!();
-
-            println!("windmenu daemon:");
-            let windmenu_status = windmenu_daemon.get_status();
-            print!("{}", windmenu_status);
-            println!();
-
-            println!("wlines daemon:");
-            let wlines_status = wlines_daemon.get_status();
-            print!("{}", wlines_status);
-        }
-        DaemonAction::Enable { method } => {
-            println!("Enabling startup method '{}' for all daemons...", method);
-
-            // Enable for windmenu
-            match windmenu_daemon.enable_startup(&method) {
-                Ok(()) => {
-                    println!("✓ windmenu daemon startup method '{}' enabled successfully", method);
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to enable windmenu daemon startup method '{}': {}", method, err);
-                }
-            }
-
-            // Enable for wlines
-            match wlines_daemon.enable_startup(&method) {
-                Ok(()) => {
-                    println!("✓ wlines daemon startup method '{}' enabled successfully", method);
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to enable wlines daemon startup method '{}': {}", method, err);
-                }
-            }
-        }
-        DaemonAction::Disable { method } => {
-            println!("Disabling startup method '{}' for all daemons...", method);
-
-            // Disable for windmenu
-            match windmenu_daemon.disable_startup(&method) {
-                Ok(()) => {
-                    println!("✓ windmenu daemon startup method '{}' disabled successfully", method);
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to disable windmenu daemon startup method '{}': {}", method, err);
-                }
-            }
-
-            // Disable for wlines
-            match wlines_daemon.disable_startup(&method) {
-                Ok(()) => {
-                    println!("✓ wlines daemon startup method '{}' disabled successfully", method);
-                }
-                Err(err) => {
-                    eprintln!("✗ Failed to disable wlines daemon startup method '{}': {}", method, err);
-                }
-            }
         }
     }
 }
@@ -466,38 +262,11 @@ fn handle_test_command(test_type: TestType) {
     }
 }
 
-fn handle_fetch_command(fetch_type: FetchType) {
-    match fetch_type {
-        FetchType::WlinesDaemon => {
-            match fetch::ensure_wlines_daemon_available() {
-                Ok(path) => {
-                    println!("wlines-daemon.exe is available at: {}", path.display());
-                }
-                Err(e) => {
-                    eprintln!("Failed to fetch wlines-daemon.exe: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        }
-        FetchType::WlinesCli => {
-            match fetch::ensure_wlines_available() {
-                Ok(path) => {
-                    println!("wlines.exe is available at: {}", path.display());
-                }
-                Err(e) => {
-                    eprintln!("Failed to fetch wlines.exe: {}", e);
-                    std::process::exit(1);
-                }
-            }
-        }
-    }
-}
-
-fn start_daemon_self_detached(wlines_daemon: &WlinesDaemon) {
+fn start_daemon_self_detached() {
     let menu = Arc::new(Menu::new());
 
     menu.hotkey.poll(|| {
-        if let Err(e) = menu.clone().show(wlines_daemon) {
+        if let Err(e) = menu.clone().show() {
             eprintln!("Menu show error: {}", e);
         }
     });

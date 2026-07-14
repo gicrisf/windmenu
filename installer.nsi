@@ -1,8 +1,8 @@
 ; Windmenu NSIS Installer Script
-; This installer bundles windmenu.exe and wlines-daemon.exe
+; This installer bundles windmenu.exe (menu renderer built in since 0.6.0)
 
 !define PRODUCT_NAME "Windmenu"
-!define PRODUCT_VERSION "0.5.1"
+!define PRODUCT_VERSION "0.6.0"
 !define PRODUCT_PUBLISHER "Giovanni Crisalfi"
 !define PRODUCT_WEB_SITE "https://github.com/gicrisf/windmenu"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\windmenu.exe"
@@ -44,7 +44,7 @@ RequestExecutionLevel user
 
 ; Finish page
 !define MUI_FINISHPAGE_RUN "$INSTDIR\windmenu.exe"
-!define MUI_FINISHPAGE_RUN_PARAMETERS "daemon all start"
+!define MUI_FINISHPAGE_RUN_PARAMETERS "daemon self start"
 !define MUI_FINISHPAGE_RUN_TEXT "Start Windmenu Daemon"
 !insertmacro MUI_PAGE_FINISH
 
@@ -74,7 +74,6 @@ Section "Core Files (required)" SecCore
   
   ; Install main binaries
   File "target\release\windmenu.exe"
-  File "assets\wlines-daemon.exe"
    
   ; Create uninstaller
   WriteUninstaller "$INSTDIR\uninstall.exe"
@@ -100,7 +99,7 @@ SectionGroupEnd
 
 SectionGroup /e "Auto-start Options" SecGrpAutoStart
 Section /o "Registry Run (Basic)" SecAutoStartRegistry
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" '"$INSTDIR\windmenu.exe" daemon all start'
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" '"$INSTDIR\windmenu.exe" daemon self start'
 SectionEnd
 
 Section /o "Task Scheduler (Admin)" SecAutoStartTask
@@ -161,7 +160,7 @@ Section /o "Task Scheduler (Admin)" SecAutoStartTask
   FileWrite $0 '  <Actions Context="Author">$\r$\n'
   FileWrite $0 '    <Exec>$\r$\n'
   FileWrite $0 '      <Command>$INSTDIR\windmenu.exe</Command>$\r$\n'
-  FileWrite $0 '      <Arguments>daemon all start</Arguments>$\r$\n'
+  FileWrite $0 '      <Arguments>daemon self start</Arguments>$\r$\n'
   FileWrite $0 '      <WorkingDirectory>$INSTDIR</WorkingDirectory>$\r$\n'
   FileWrite $0 '    </Exec>$\r$\n'
   FileWrite $0 '  </Actions>$\r$\n'
@@ -185,7 +184,7 @@ Section /o "Current User Startup Folder" SecAutoStartUser
   ; Create VBS script for silent startup
   FileOpen $0 "$INSTDIR\start-windmenu-user.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon all start", 0, False$\r$\n'
+  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon self start", 0, False$\r$\n'
   FileClose $0
 
   ; Copy to user startup folder
@@ -196,7 +195,7 @@ Section /o "All Users Startup Folder" SecAutoStartAll
   ; Create VBS script for silent startup
   FileOpen $0 "$INSTDIR\start-windmenu-all.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon all start", 0, False$\r$\n'
+  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon self start", 0, False$\r$\n'
   FileClose $0
 
   ; Copy to all users startup folder (requires admin privileges)
@@ -206,7 +205,7 @@ SectionGroupEnd
 
 ; Component descriptions
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecCore} "Core Windmenu files (windmenu.exe, wlines-daemon.exe) and configuration files"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecCore} "Core Windmenu files (windmenu.exe) and configuration files"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecStartMenu} "Create shortcuts in Start Menu"
     !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartRegistry} "Start Windmenu automatically using Windows Registry (basic method, starts when current user logs in)"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartTask} "Start Windmenu automatically using Task Scheduler (recommended - most reliable, but needs admin privileges)"

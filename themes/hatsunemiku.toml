@@ -15,7 +15,7 @@ text_foreground_color = "#dcd7d7"   # Input field text color (light gray)
 font_name = "Consolas"              # Font family name (monospace recommended)
 font_size = 16                      # Font size in points
 prompt = "Run:"                     # Custom prompt text shown in input field
-filter_mode = "fuzzy"               # Search mode: "fuzzy" or "substring"
+filter_mode = "keywords"            # Search mode: "complete" (whole query as substring) or "keywords" (each word must match)
 
 # ===============================================================================
 # Hatsune Miku Palette Reference

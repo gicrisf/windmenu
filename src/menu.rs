@@ -4,17 +4,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::process::{Command, Stdio};
-use std::io::Write;
 use std::thread;
-use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::process::CommandExt;
 use std::fmt;
 use serde::Deserialize;
 use toml;
-use winapi::um::fileapi::{CreateFileW, WriteFile, ReadFile, OPEN_EXISTING};
-use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
-use winapi::um::winnt::{GENERIC_READ, GENERIC_WRITE};
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::shellapi::ShellExecuteW;
 use winapi::um::winuser::{
@@ -26,19 +21,15 @@ use winapi::um::winuser::{
     VK_OEM_MINUS, VK_OEM_PLUS
 };
 use winapi::um::winbase::CREATE_NEW_PROCESS_GROUP;
-use winapi::shared::minwindef::{DWORD, FALSE};
 
 use crate::apps::{find_reparse_points, get_windows_apps_path};
-use crate::daemon::{WlinesDaemon, Daemon};
 use crate::theme::WlinesTheme;
 use crate::wlan;
+use crate::wlines;
 
 #[derive(Debug)]
 pub enum MenuError {
     ConfigLoad(String),
-    PipeConnection(u32),
-    PipeWrite(u32),
-    PipeRead(u32),
     CommandExecution(String),
     KeyParsing(String),
     KeyInput(u32),
@@ -46,17 +37,12 @@ pub enum MenuError {
     InvalidArguments(String),
     WindowsApi(u32),
     MenuAlreadyRunning,
-    DaemonCommunicationFailed(String),
-    DirectExecutionFailed(String),
 }
 
 impl fmt::Display for MenuError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MenuError::ConfigLoad(msg) => write!(f, "Failed to load configuration: {}", msg),
-            MenuError::PipeConnection(error) => write!(f, "Failed to connect to pipe: error {}", error),
-            MenuError::PipeWrite(error) => write!(f, "Failed to write to pipe: error {}", error),
-            MenuError::PipeRead(error) => write!(f, "Failed to read from pipe: error {}", error),
             MenuError::CommandExecution(msg) => write!(f, "Failed to execute command: {}", msg),
             MenuError::KeyParsing(key) => write!(f, "Unknown key: {}", key),
             MenuError::KeyInput(error) => write!(f, "Failed to send key input: error {}", error),
@@ -64,8 +50,6 @@ impl fmt::Display for MenuError {
             MenuError::InvalidArguments(msg) => write!(f, "Invalid arguments: {}", msg),
             MenuError::WindowsApi(error) => write!(f, "Windows API error: {}", error),
             MenuError::MenuAlreadyRunning => write!(f, "Menu is already running"),
-            MenuError::DaemonCommunicationFailed(msg) => write!(f, "Daemon communication failed: {}", msg),
-            MenuError::DirectExecutionFailed(msg) => write!(f, "Direct execution failed: {}", msg),
         }
     }
 }
@@ -194,9 +178,8 @@ enum CommandType {
 pub struct Menu {
     pub process_running: Mutex<bool>,
     pub commands: HashMap<String, MenuCommand>,
-    pub wlines_args: Vec<String>,
+    pub settings: wlines::Settings,
     pub hotkey: Hotkey,
-    pub wlines_cli_path: Option<PathBuf>,
 }
 
 fn get_start_menu_paths() -> Vec<PathBuf> {
@@ -242,8 +225,7 @@ impl Menu {
             poll_interval: 50, // 50ms
         };
         let mut commands = HashMap::new();
-        let mut wlines_args = vec![];
-        let mut wlines_cli_path = None;
+        let mut settings = WlinesTheme::default().to_settings();
 
         // Add Start menu commands
         for path in get_start_menu_paths() {
@@ -272,19 +254,14 @@ impl Menu {
         // Load config and process commands/options
         let config = MenuConfig::load().ok();
 
-        if let Some((cfg, config_dir)) = config {
-            // Update wlines args from theme
+        if let Some((cfg, _config_dir)) = config {
+            // Convert theme to renderer settings
             if let Some(ref theme) = &cfg.theme {
-                wlines_args = theme.to_args();
-                // Generate wlines daemon config next to the loaded config file
-                let wlines_config_path = config_dir.join("wlines-config.txt");
-                if let Err(e) = WlinesTheme::generate_wlines_config(&wlines_config_path, Some(theme)) {
-                    eprintln!("Warning: Failed to generate wlines config: {}", e);
-                }
+                settings = theme.to_settings();
             }
-            // Update wlines CLI path
-            if let Some(ref path) = &cfg.wlines_cli_path {
-                wlines_cli_path = Some(PathBuf::from(path));
+            // wlines_cli_path is obsolete: the renderer is now built in
+            if cfg.wlines_cli_path.is_some() {
+                eprintln!("Warning: 'wlines_cli_path' in windmenu.toml is no longer used; the menu renderer is built into windmenu");
             }
             // Update hotkey keys from config
             if let Some(ref keys) = &cfg.hotkey {
@@ -317,101 +294,44 @@ impl Menu {
         Menu {
             process_running,
             commands,
-            wlines_args,
+            settings,
             hotkey,
-            wlines_cli_path,
         }
     }
 
-    pub fn show(self: Arc<Self>, wlines_daemon: &WlinesDaemon) -> Result<(), MenuError> {
-        // Check if already running
+    pub fn show(self: Arc<Self>) -> Result<(), MenuError> {
+        // Check and set the running flag atomically
         {
-            let running = self.process_running.lock().unwrap();
+            let mut running = self.process_running.lock().unwrap();
             if *running {
                 return Err(MenuError::MenuAlreadyRunning);
             }
+            *running = true;
         }
 
-        // Prepare command list
-        let command_list = self.prepare_command_list();
+        let entries = self.prepare_entries();
 
-        if wlines_daemon.is_running() {
-            // Using preferred method: Daemon communication via named pipe
-            self.show_via_daemon(&command_list)
-            // You could also:
-            // self.show_via_daemon(&command_list).or_else(|daemon_error| { ... })
-            // To raise a windows dialog and alert the user in this case
-        } else if self.wlines_cli_path.is_some() {
-            // Using fallback method: Direct wlines.exe execution
-            self.show_via_direct_execution(&command_list)
-        } else {
-            // No daemon running and no CLI path configured
-            Err(MenuError::DirectExecutionFailed(
-                "Wlines daemon is not running and no CLI path is configured. Either start the wlines daemon or configure 'wlines_cli_path' in windmenu.toml".to_string()
-            ))
-        }
-    }
-
-    fn prepare_command_list(&self) -> String {
-        self.commands.keys()
-                     .fold(String::new(), |acc, s| {
-                         if acc.is_empty() { s.to_string() } else { acc + "\n" + s }
-                     })
-    }
-
-    fn show_via_daemon(&self, command_list: &str) -> Result<(), MenuError> {
-        match Self::send_to_wlines_daemon(command_list) {
-            Ok(selected) => {
-                self.execute_command(&selected)
-            }
-            Err(e) => {
-                Err(MenuError::DaemonCommunicationFailed(e.to_string()))
-            }
-        }
-    }
-
-    fn show_via_direct_execution(self: Arc<Self>, command_list: &str) -> Result<(), MenuError> {
-        // Clone before spawning a new thread
-        let command_list = command_list.to_string();
-
-        // Set running flag
-        *self.process_running.lock().unwrap() = true;
-
+        // Run the menu window and its message loop on a dedicated thread
         thread::spawn(move || {
-            let result = (|| -> Result<(), MenuError> {
-                let mut child = Command::new(self.wlines_cli_path.as_ref().unwrap())
-                    .args(&self.wlines_args)
-                    .stdin(Stdio::piped())
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .spawn()
-                    .map_err(|e| MenuError::DirectExecutionFailed(format!("Failed to spawn {}: {}", self.wlines_cli_path.as_ref().unwrap().display(), e)))?;
-
-                if let Some(stdin) = child.stdin.as_mut() {
-                    stdin.write_all(command_list.as_bytes())
-                        .map_err(|e| MenuError::DirectExecutionFailed(format!("Failed to write to stdin: {}", e)))?;
-                }
-
-                let output = child.wait_with_output()
-                    .map_err(|e| MenuError::DirectExecutionFailed(format!("Failed to read output: {}", e)))?;
-
-                let selected = std::str::from_utf8(&output.stdout)
-                    .unwrap_or("")
-                    .trim();
-
-                self.execute_command(selected)
-            })();
+            let result = match wlines::show(&self.settings, &entries) {
+                Some(selected) => self.execute_command(&selected),
+                None => Ok(()), // User cancelled
+            };
 
             // Always reset the running flag, regardless of success or failure
             *self.process_running.lock().unwrap() = false;
 
             // Log any errors that occurred
             if let Err(e) = result {
-                eprintln!("Direct execution error: {}", e);
+                eprintln!("Menu error: {}", e);
             }
         });
 
         Ok(())
+    }
+
+    fn prepare_entries(&self) -> Vec<String> {
+        self.commands.keys().cloned().collect()
     }
 
     fn execute_command(&self, selected: &str) -> Result<(), MenuError> {
@@ -444,88 +364,6 @@ impl Menu {
                 }
             }
         }
-    }
-
-    fn send_to_wlines_daemon(data: &str) -> Result<String, MenuError> {
-        unsafe {
-            // Convert pipe name to wide string
-            let pipe_name_wide: Vec<u16> = OsStr::new(WlinesDaemon::PIPE_NAME)
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
-
-            // Create file handle for the named pipe with read/write access
-            let h_pipe = CreateFileW(
-                pipe_name_wide.as_ptr(),
-                GENERIC_READ | GENERIC_WRITE,
-                0,
-                std::ptr::null_mut(),
-                OPEN_EXISTING,
-                0,
-                std::ptr::null_mut(),
-            );
-
-            if h_pipe == INVALID_HANDLE_VALUE {
-                let error = GetLastError();
-                println!("Failed to connect to pipe: error {}", error);
-                return Err(MenuError::PipeConnection(error));
-            }
-
-            // Write data to pipe
-            let data_bytes = data.as_bytes();
-            let mut bytes_written: DWORD = 0;
-
-            let write_success = WriteFile(
-                h_pipe,
-                data_bytes.as_ptr() as *const _,
-                data_bytes.len() as DWORD,
-                &mut bytes_written,
-                std::ptr::null_mut(),
-            );
-
-            if write_success == FALSE {
-                let error = GetLastError();
-                println!("Failed to write to pipe: error {}", error);
-                CloseHandle(h_pipe);
-                return Err(MenuError::PipeWrite(error));
-            }
-
-            println!("Sent {} bytes to daemon", bytes_written);
-
-            // Read response from pipe
-            const BUFFER_SIZE: usize = 1024;
-            let mut buffer = vec![0u8; BUFFER_SIZE];
-            let mut bytes_read: DWORD = 0;
-
-            let read_success = ReadFile(
-                h_pipe,
-                buffer.as_mut_ptr() as *mut _,
-                BUFFER_SIZE as DWORD,
-                &mut bytes_read,
-                std::ptr::null_mut(),
-            );
-
-            CloseHandle(h_pipe);
-
-            if read_success != FALSE && bytes_read > 0 {
-                // Convert bytes to string, trimming null bytes and whitespace
-                let response = String::from_utf8_lossy(&buffer[..bytes_read as usize])
-                    .trim_end_matches('\0')
-                    .trim()
-                    .to_string();
-
-                if !response.is_empty() {
-                    println!("Received: '{}'", response);
-                    return Ok(response);
-                }
-            } else {
-                let error = GetLastError();
-                println!("Failed to read from pipe: error {}", error);
-                return Err(MenuError::PipeRead(error));
-            }
-        }
-
-        Err(MenuError::PipeRead(0))
     }
 
     fn launch_program(path: &Path) -> Result<(), MenuError> {

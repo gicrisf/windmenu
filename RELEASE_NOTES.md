@@ -1,3 +1,14 @@
+## Single-process architecture (0.6.0)
+
+The menu renderer is now a native Rust module inside `windmenu.exe` — a full port of the wlines C renderer. The two-process design (windmenu.exe + wlines-daemon.exe over a named pipe, with wlines.exe CLI fallback) is gone, and with it the main source of instability: pipe races, daemon lifecycle detection, and silent fallback paths.
+
+- One executable, nothing to fetch: `windmenu fetch` and the bundled `wlines-daemon.exe` are removed
+- `windmenu daemon wlines ...` and `windmenu daemon all ...` subcommands removed; use `windmenu daemon self ...`
+- Config keys `wlines_daemon_path` and `wlines_cli_path` are obsolete (a warning is printed if present); `wlines-config.txt` is no longer generated
+- Each hotkey press opens a fresh menu window in-process — no stale daemon state, no orphaned renderer processes
+- `filter_mode` values are `complete` or `keywords` (as in wlines; the previously documented `fuzzy`/`substring` values never existed and fell back to `complete`)
+- Upgraders: remove old wlines-daemon auto-start entries (see "Upgrading from 0.5.x" in the README)
+
 ## Bug Fixes
 
 - Daemon spawning now uses `current_exe` instead of relying on PATH, avoiding the console window flash caused by package manager shims (e.g. Scoop wrappers)

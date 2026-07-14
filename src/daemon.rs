@@ -480,50 +480,6 @@ impl Daemon for WindmenuDaemon {
 }
 
 #[derive(Debug, Clone)]
-pub struct WlinesDaemon {
-    pub path: PathBuf,
-}
-
-impl WlinesDaemon {
-    // Named pipe name for communicating with wlines daemon
-    pub const PIPE_NAME: &'static str = r"\\.\pipe\wlines_pipe";
-
-    pub fn new<P: AsRef<Path>>(path: P) -> Self {
-        Self { path: path.as_ref().to_path_buf() }
-    }
-}
-
-impl Daemon for WlinesDaemon {
-    fn path(&self) -> &Path {
-        &self.path
-    }
-
-    fn name(&self) -> &'static str {
-        "wlines"
-    }
-
-    fn process_name(&self) -> &'static str {
-        "wlines-daemon.exe"
-    }
-
-    fn registry_name(&self) -> &'static str {
-        "WlinesDaemon"
-    }
-
-    fn task_name(&self) -> &'static str {
-        "wlines-daemon"
-    }
-
-    fn user_script_name(&self) -> &'static str {
-        "start-wlines-daemon-user.vbs"
-    }
-
-    fn all_users_script_name(&self) -> &'static str {
-        "start-wlines-daemon-all.vbs"
-    }
-}
-
-#[derive(Debug, Clone)]
 pub struct DaemonStatus {
     pub is_running: bool,
     pub processes: Vec<ProcessInfo>,
