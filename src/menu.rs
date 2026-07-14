@@ -295,6 +295,11 @@ struct MenuConfig {
     hotkey: Option<Vec<String>>, // Custom hotkey keys (e.g., ["WIN", "SPACE"])
 }
 
+/// The commented default config, embedded at compile time. This is the same
+/// file that ships in the repo, so `config init` produces a byte-identical,
+/// fully documented windmenu.toml — the binary carries its own config template.
+const DEFAULT_CONFIG: &str = include_str!("../windmenu.toml");
+
 impl MenuConfig {
     const DEFAULT_CONFIG_PATH: &'static str = "windmenu.toml";
 
@@ -306,31 +311,47 @@ impl MenuConfig {
         Ok(config)
     }
 
-    fn load() -> Result<(MenuConfig, PathBuf), MenuError> {
-        // Try CWD first (portable installs)
+    /// Resolve the config file to use: CWD first (portable installs), then the
+    /// executable's directory (Scoop installs). None if neither exists.
+    fn resolve_path() -> Option<PathBuf> {
         let cwd_path = Path::new(Self::DEFAULT_CONFIG_PATH);
         if cwd_path.exists() {
-            let config = Self::load_from_file(cwd_path)?;
-            let config_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            return Ok((config, config_dir));
+            let dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            return Some(dir.join(Self::DEFAULT_CONFIG_PATH));
         }
-        // Fall back to executable's directory (Scoop installs)
         if let Ok(exe_path) = env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
                 let exe_config = exe_dir.join(Self::DEFAULT_CONFIG_PATH);
                 if exe_config.exists() {
-                    let config = Self::load_from_file(&exe_config)?;
-                    return Ok((config, exe_dir.to_path_buf()));
+                    return Some(exe_config);
                 }
             }
         }
-        // Neither found — return the CWD error for backward-compatible messaging
-        let config = Self::load_from_file(cwd_path)?;
-        Ok((config, env::current_dir().unwrap_or_else(|_| PathBuf::from("."))))
+        None
+    }
+
+    fn load() -> Result<(MenuConfig, PathBuf), MenuError> {
+        match Self::resolve_path() {
+            Some(path) => {
+                let config = Self::load_from_file(&path)?;
+                let config_dir = path.parent()
+                    .map(|p| p.to_path_buf())
+                    .unwrap_or_else(|| PathBuf::from("."));
+                Ok((config, config_dir))
+            }
+            None => {
+                // Nothing found — return the CWD read error for backward-compatible messaging
+                let cwd_path = Path::new(Self::DEFAULT_CONFIG_PATH);
+                let config = Self::load_from_file(cwd_path)?;
+                Ok((config, env::current_dir().unwrap_or_else(|_| PathBuf::from("."))))
+            }
+        }
     }
 }
 
-pub fn print_config_debug() {
+/// `config path` / `test config`: report where windmenu looks for its config
+/// and which file (if any) is currently in effect.
+pub fn config_path() {
     let exe_path = env::current_exe().ok();
     println!("Exe path: {}", exe_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "unknown".into()));
     println!("CWD: {}", env::current_dir().map(|p| p.display().to_string()).unwrap_or_else(|_| "unknown".into()));
@@ -343,10 +364,89 @@ pub fn print_config_debug() {
         println!("Exe config ({}): {}", exe_config.display(), if exe_config.exists() { "found" } else { "not found" });
     }
 
-    match MenuConfig::load() {
-        Ok((_, config_dir)) => println!("Result: loaded from {}", config_dir.display()),
-        Err(e) => println!("Result: {}", e),
+    match MenuConfig::resolve_path() {
+        Some(path) => match MenuConfig::load_from_file(&path) {
+            Ok(_) => println!("Result: using {}", path.display()),
+            Err(e) => println!("Result: {} ({})", e, path.display()),
+        },
+        None => println!("Result: no config file found — using built-in defaults"),
     }
+}
+
+/// The default location `config init` writes to: next to the executable. This
+/// matches the portable-binary story and Scoop installs, and is independent of
+/// the shell's current directory.
+fn init_target() -> Result<PathBuf, String> {
+    let exe = env::current_exe().map_err(|e| format!("cannot locate executable: {}", e))?;
+    let dir = exe.parent().ok_or_else(|| "executable has no parent directory".to_string())?;
+    Ok(dir.join(MenuConfig::DEFAULT_CONFIG_PATH))
+}
+
+const RESTART_REMINDER: &str =
+    "Restart the daemon ('windmenu daemon restart') or run 'Reload Config' from the menu to apply changes.";
+
+/// `config init`: write the embedded default config next to the executable.
+/// Refuses to overwrite an existing file unless `force` is set. Returns a
+/// process exit code.
+pub fn config_init(force: bool) -> i32 {
+    let target = match init_target() {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("config init: {}", e);
+            return 1;
+        }
+    };
+
+    if target.exists() && !force {
+        eprintln!("config init: {} already exists; use --force to overwrite", target.display());
+        return 1;
+    }
+
+    if let Err(e) = fs::write(&target, DEFAULT_CONFIG) {
+        eprintln!("config init: failed to write {}: {}", target.display(), e);
+        return 1;
+    }
+
+    println!("Wrote default config to {}", target.display());
+    println!("{}", RESTART_REMINDER);
+    0
+}
+
+/// `config edit`: open the resolved config in an editor, creating it first if
+/// none exists. Uses %EDITOR% when set, otherwise notepad. Returns an exit code.
+pub fn config_edit() -> i32 {
+    let path = match MenuConfig::resolve_path() {
+        Some(p) => p,
+        None => {
+            // No config anywhere yet: create one next to the exe, then edit it.
+            let code = config_init(false);
+            if code != 0 {
+                return code;
+            }
+            match MenuConfig::resolve_path() {
+                Some(p) => p,
+                None => {
+                    eprintln!("config edit: config file not found after init");
+                    return 1;
+                }
+            }
+        }
+    };
+
+    let editor = env::var("EDITOR").unwrap_or_else(|_| "notepad.exe".to_string());
+    println!("Opening {} in {}", path.display(), editor);
+    match Command::new(&editor).arg(&path).spawn() {
+        Ok(mut child) => {
+            let _ = child.wait();
+        }
+        Err(e) => {
+            eprintln!("config edit: failed to launch {}: {}", editor, e);
+            return 1;
+        }
+    }
+
+    println!("{}", RESTART_REMINDER);
+    0
 }
 
 

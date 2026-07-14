@@ -40,11 +40,30 @@ enum Commands {
         #[command(subcommand)]
         action: DaemonAction,
     },
+    /// Manage the windmenu.toml configuration
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
     /// Test utilities
     Test {
         #[command(subcommand)]
         test_type: TestType,
     },
+}
+
+#[derive(Subcommand)]
+enum ConfigAction {
+    /// Write a default windmenu.toml next to the executable
+    Init {
+        /// Overwrite an existing config file
+        #[arg(long)]
+        force: bool,
+    },
+    /// Show config resolution paths and the file in use
+    Path,
+    /// Open the config in an editor (creating it if needed)
+    Edit,
 }
 
 #[derive(Subcommand)]
@@ -238,6 +257,9 @@ fn main() {
         Some(Commands::Daemon { action }) => {
             handle_daemon_action(action, &windmenu_daemon);
         }
+        Some(Commands::Config { action }) => {
+            handle_config_command(action);
+        }
         Some(Commands::Test { test_type }) => {
             handle_test_command(test_type);
         }
@@ -347,13 +369,27 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
     }
 }
 
+fn handle_config_command(action: ConfigAction) {
+    let code = match action {
+        ConfigAction::Init { force } => menu::config_init(force),
+        ConfigAction::Path => {
+            menu::config_path();
+            0
+        }
+        ConfigAction::Edit => menu::config_edit(),
+    };
+    if code != 0 {
+        cli_exit(code);
+    }
+}
+
 fn handle_test_command(test_type: TestType) {
     match test_type {
         TestType::ReparsePoints => {
             print_reparse_points_info();
         }
         TestType::Config => {
-            menu::print_config_debug();
+            menu::config_path();
         }
     }
 }
