@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::ffi::OsStr;
@@ -62,13 +62,101 @@ impl fmt::Display for MenuError {
 
 impl std::error::Error for MenuError {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MenuCommand {
     Start(PathBuf),            // For Start menu shortcuts
     Configured(Vec<String>),  // For configured commands
     KeyCombo(Vec<String>),    // For key combinations like ALT+X
     ToggleCapsLock,           // For caps lock toggle
     WlanScan,                 // For WLAN network scan
+    RefreshApps,              // Rescan Start Menu and Windows Store apps
+    ReloadConfig,             // Reload commands from windmenu.toml
+}
+
+pub(crate) struct EntryStore {
+    builtins: HashMap<String, MenuCommand>,
+    config: HashMap<String, MenuCommand>,
+    dynamic: HashMap<String, MenuCommand>,
+}
+
+impl EntryStore {
+    fn empty() -> Self {
+        let mut builtins = HashMap::new();
+        builtins.insert("Toggle Caps Lock".to_string(), MenuCommand::ToggleCapsLock);
+        builtins.insert("WLAN Scan".to_string(), MenuCommand::WlanScan);
+        builtins.insert("Refresh Apps".to_string(), MenuCommand::RefreshApps);
+        builtins.insert("Reload Config".to_string(), MenuCommand::ReloadConfig);
+        Self { builtins, config: HashMap::new(), dynamic: HashMap::new() }
+    }
+
+    fn apply_config_commands(&mut self, cmds: Vec<CommandConfig>) {
+        let mut config = HashMap::new();
+        for cmd in cmds {
+            let (key, command) = match cmd.command_type {
+                CommandType::Args { args } => (cmd.name, MenuCommand::Configured(args)),
+                CommandType::Keys { keys } => {
+                    let key_sequence = keys.join(", ");
+                    let formatted_key = format!("{} [{}]", cmd.name, key_sequence);
+                    (formatted_key, MenuCommand::KeyCombo(keys))
+                }
+            };
+            config.insert(key, command);
+        }
+        self.config = config;
+    }
+
+    pub(crate) fn reload_config(&mut self) {
+        if let Some((cfg, _)) = MenuConfig::load().ok() {
+            if let Some(cmds) = cfg.commands {
+                self.apply_config_commands(cmds);
+            } else {
+                self.config.clear();
+            }
+        }
+    }
+
+    pub(crate) fn rescan_dynamic(&mut self) {
+        let mut dynamic = HashMap::new();
+
+        for path in get_start_menu_paths() {
+            if let Ok(lnk_files) = find_lnk_files(&path) {
+                for (name, path) in lnk_files {
+                    dynamic.insert(name, MenuCommand::Start(path));
+                }
+            }
+        }
+
+        if let Some(windows_apps_path) = get_windows_apps_path() {
+            if let Ok(reparse_points) = find_reparse_points(&windows_apps_path) {
+                for rp in reparse_points {
+                    let command_name = if let Some(stem) = rp.full_path.file_stem().and_then(|s| s.to_str()) {
+                        stem.to_string()
+                    } else {
+                        rp.name.clone()
+                    };
+                    dynamic.insert(command_name, MenuCommand::Start(rp.full_path));
+                }
+            }
+        }
+
+        self.dynamic = dynamic;
+    }
+
+    fn all_entries(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.builtins.keys()
+            .chain(self.config.keys())
+            .chain(self.dynamic.keys())
+            .cloned()
+            .collect();
+        keys.sort();
+        keys
+    }
+
+    fn get(&self, name: &str) -> Option<&MenuCommand> {
+        self.builtins.get(name)
+            .or_else(|| self.config.get(name))
+            .or_else(|| self.dynamic.get(name))
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -277,7 +365,7 @@ enum CommandType {
 
 pub struct Menu {
     pub process_running: Mutex<bool>,
-    pub commands: HashMap<String, MenuCommand>,
+    pub entries: Arc<RwLock<EntryStore>>,
     pub settings: wlines::Settings,
     pub hotkey: Hotkey,
 }
@@ -323,68 +411,24 @@ impl Menu {
         let mut hotkey = Hotkey {
             keys: vec!["WIN".to_string(), "SPACE".to_string()],
         };
-        let mut commands = HashMap::new();
         let mut settings = WlinesTheme::default().to_settings();
+        let entries = Arc::new(RwLock::new(EntryStore::empty()));
 
-        // Add Start menu commands
-        for path in get_start_menu_paths() {
-            if let Ok(lnk_files) = find_lnk_files(&path) {
-                for (name, path) in lnk_files {
-                    commands.insert(name, MenuCommand::Start(path));
-                }
-            }
-        }
-
-        // Add Windows Apps reparse points
-        if let Some(windows_apps_path) = get_windows_apps_path() {
-            if let Ok(reparse_points) = find_reparse_points(&windows_apps_path) {
-                for rp in reparse_points {
-                    // Use the reparse point name without extension for the command key
-                    let command_name = if let Some(stem) = rp.full_path.file_stem().and_then(|s| s.to_str()) {
-                        stem.to_string()
-                    } else {
-                        rp.name.clone()
-                    };
-                    commands.insert(command_name, MenuCommand::Start(rp.full_path));
-                }
-            }
-        }
-
-        // Load config and process commands/options
-        let config = MenuConfig::load().ok();
-
-        if let Some((cfg, _config_dir)) = config {
-            // Convert theme to renderer settings
+        if let Some((cfg, _config_dir)) = MenuConfig::load().ok() {
             if let Some(ref theme) = &cfg.theme {
                 settings = theme.to_settings();
             }
-            // Update hotkey keys from config
             if let Some(ref keys) = &cfg.hotkey {
                 hotkey.keys = keys.clone();
             }
-            // Key commands
-            if let Some(config_commands) = cfg.commands {
-                for cmd in config_commands {
-                let (key, command) = match cmd.command_type {
-                    CommandType::Args { args } => (cmd.name, MenuCommand::Configured(args)),
-                    CommandType::Keys { keys } => {
-                        let key_sequence = keys.join(", ");
-                        let formatted_key = format!("{} [{}]", cmd.name, key_sequence);
-                        (formatted_key, MenuCommand::KeyCombo(keys))
-                    }
-                };
-                commands.insert(key, command);
-                }
+            if let Some(cmds) = cfg.commands {
+                entries.write().unwrap().apply_config_commands(cmds);
             }
         }
 
-        // Add built-in commands
-        commands.insert("Toggle Caps Lock".to_string(), MenuCommand::ToggleCapsLock);
-        commands.insert("WLAN Scan".to_string(), MenuCommand::WlanScan);
-
         Menu {
             process_running,
-            commands,
+            entries,
             settings,
             hotkey,
         }
@@ -422,22 +466,26 @@ impl Menu {
     }
 
     fn prepare_entries(&self) -> Vec<String> {
-        self.commands.keys().cloned().collect()
+        self.entries.read().unwrap().all_entries()
     }
 
     fn execute_command(&self, selected: &str) -> Result<(), MenuError> {
-        match self.commands.get(selected) {
+        let cmd = {
+            self.entries.read().unwrap().get(selected).cloned()
+        };
+
+        match cmd {
             Some(MenuCommand::Start(path)) => {
                 println!("Executing Start command: {}", selected);
-                Self::launch_program(path)
+                Self::launch_program(&path)
             },
             Some(MenuCommand::Configured(args)) => {
                 println!("Executing command: {}", selected);
-                Self::launch_command(args)
+                Self::launch_command(&args)
             },
             Some(MenuCommand::KeyCombo(keys)) => {
                 println!("Executing key combination: {}", selected);
-                Self::send_key_combination(keys)
+                Self::send_key_combination(&keys)
             },
             Some(MenuCommand::ToggleCapsLock) => {
                 println!("Toggling caps lock: {}", selected);
@@ -447,11 +495,25 @@ impl Menu {
                 println!("Performing WLAN scan: {}", selected);
                 Self::perform_wlan_scan()
             },
+            Some(MenuCommand::RefreshApps) => {
+                let entries = self.entries.clone();
+                thread::spawn(move || {
+                    entries.write().unwrap().rescan_dynamic();
+                });
+                Ok(())
+            },
+            Some(MenuCommand::ReloadConfig) => {
+                let entries = self.entries.clone();
+                thread::spawn(move || {
+                    entries.write().unwrap().reload_config();
+                });
+                Ok(())
+            },
             None => {
                 if !selected.is_empty() {
                     Err(MenuError::CommandExecution(format!("No command found for selection: '{}'", selected)))
                 } else {
-                    Ok(()) // Empty selection is fine, user probably cancelled
+                    Ok(())
                 }
             }
         }

@@ -6,6 +6,7 @@
 use std::sync::Arc;
 use std::env;
 use std::path::PathBuf;
+use std::thread;
 use clap::{Parser, Subcommand};
 
 mod apps;
@@ -286,6 +287,11 @@ fn start_daemon_self_detached() {
     }
 
     let menu = Arc::new(Menu::new());
+
+    let entries_bg = menu.entries.clone();
+    thread::spawn(move || {
+        entries_bg.write().unwrap().rescan_dynamic();
+    });
 
     menu.hotkey.listen(|| {
         if let Err(e) = menu.clone().show() {
