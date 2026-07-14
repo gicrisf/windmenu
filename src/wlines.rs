@@ -52,9 +52,10 @@ pub enum FilterMode {
 impl FilterMode {
     pub fn parse(s: &str) -> FilterMode {
         match s.to_ascii_lowercase().as_str() {
+            "complete" | "0" => FilterMode::Complete,
             "keywords" | "1" => FilterMode::Keywords,
             "fuzzy" | "2" => FilterMode::Fuzzy,
-            _ => FilterMode::Complete,
+            _ => FilterMode::Keywords,
         }
     }
 }
@@ -84,7 +85,7 @@ impl Default for Settings {
         Settings {
             line_count: 15,
             prompt: None,
-            filter_mode: FilterMode::Complete,
+            filter_mode: FilterMode::Fuzzy,
             initial_index: 0,
             padding: 4,
             width: 0,
