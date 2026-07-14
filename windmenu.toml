@@ -8,11 +8,11 @@
 # DAEMON
 # ===============================================================================
 
-# Custom hotkey (default is ["WIN", "SPACE"])
+# Custom hotkey (default is ["CTRL", "ALT", "SPACE"])
 # Examples:
 # hotkey = ["CTRL", "ALT", "X"] # Ctrl+Alt+X
 # hotkey = ["ALT", "F2"]        # Alt+F2 (like GNOME)
-# hotkey = ["CTRL", "ALT", "SPACE"]
+# hotkey = ["WIN", "SHIFT", "SPACE"]
 
 # The hotkey is registered with Windows (RegisterHotKey): any number of
 # modifiers (WIN/CTRL/ALT/SHIFT) plus exactly one other key.

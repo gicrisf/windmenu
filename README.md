@@ -5,7 +5,7 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 
 ## Features
 
-- Fast application launcher via hotkey (Win+Space is default)
+- Fast application launcher via hotkey (Ctrl+Alt+Space is default)
 - Vim-like navigation (Ctrl+J/K) alongside arrow keys
 - Scans Windows Start Menu shortcuts automatically
 - Supports custom commands via configuration
@@ -36,7 +36,7 @@ scoop install windmenu
 
 Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe daemon start`.
 
-Press `Win+Space` to launch.
+Press `Ctrl+Alt+Space` to launch.
 
 ### Auto-Startup
 
@@ -54,15 +54,13 @@ To customize the hotkey or add your own commands, edit `windmenu.toml` in the sa
 
 ```toml
 # Change the hotkey
-hotkey = ["WIN", "SPACE"]  # Default
+hotkey = ["CTRL", "ALT", "SPACE"]  # Default
 
-# If you use multiple keyboard layouts, try one of these instead:
+# Other combos to try:
 # hotkey = ["WIN", "R"]
-# hotkey = ["ALT", "SPACE"]
 # hotkey = ["CTRL", "SPACE"]
+# hotkey = ["WIN", "SHIFT", "SPACE"]
 ```
-
-**Note on the default hotkey**: `Win+Space` is Windows' language switcher shortcut. If you only use one keyboard layout (like US English), this won't matter - the conflict is harmless. But if you switch between multiple languages, you'll want to change the hotkey to something else.
 
 For full configuration options, check the [example windmenu.toml](https://github.com/gicrisf/windmenu/blob/main/windmenu.toml) in the repository.
 

@@ -272,12 +272,18 @@ impl Hotkey {
     /// detached daemon process has stdout/stderr redirected to null.
     fn fatal(message: &str) -> ! {
         eprintln!("{}", message);
-        unsafe {
-            let text: Vec<u16> = OsStr::new(message).encode_wide().chain(std::iter::once(0)).collect();
-            let caption: Vec<u16> = OsStr::new("windmenu").encode_wide().chain(std::iter::once(0)).collect();
-            MessageBoxW(std::ptr::null_mut(), text.as_ptr(), caption.as_ptr(), MB_OK | MB_ICONERROR);
-        }
+        error_box(message);
         std::process::exit(1);
+    }
+}
+
+/// Show an error message box. Used for errors that must reach the user even
+/// when the detached daemon has stdout/stderr redirected to null.
+pub fn error_box(message: &str) {
+    unsafe {
+        let text: Vec<u16> = OsStr::new(message).encode_wide().chain(std::iter::once(0)).collect();
+        let caption: Vec<u16> = OsStr::new("windmenu").encode_wide().chain(std::iter::once(0)).collect();
+        MessageBoxW(std::ptr::null_mut(), text.as_ptr(), caption.as_ptr(), MB_OK | MB_ICONERROR);
     }
 }
 
@@ -402,8 +408,9 @@ impl Menu {
     pub fn new() -> Menu {
         let process_running = Mutex::new(false);
 
+        // Ctrl+Alt+Space
         let mut hotkey = Hotkey {
-            keys: vec!["WIN".to_string(), "SPACE".to_string()],
+            keys: vec!["CTRL".to_string(), "ALT".to_string(), "SPACE".to_string()],
         };
         let mut settings = WlinesTheme::default().to_settings();
         let entries = Arc::new(RwLock::new(EntryStore::empty()));

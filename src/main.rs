@@ -114,8 +114,46 @@ fn attach_parent_console() {
     }
 }
 
+/// Surface panics in a message box: with panic = "abort", a GUI subsystem and
+/// the daemon's stderr detached, a panic on any thread would otherwise kill
+/// the process with no trace — the hotkey just stops working.
+fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let payload = info.payload();
+        let message = payload
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+            .unwrap_or("unknown panic");
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_else(|| "unknown location".to_string());
+        let text = format!("windmenu crashed: {} ({})", message, location);
+        eprintln!("{}", text);
+        menu::error_box(&text);
+    }));
+}
+
+/// Opt in to per-monitor DPI awareness so GDI text renders crisply on scaled
+/// displays instead of being bitmap-stretched. Done via API rather than an
+/// embedded manifest to keep the cross-compile free of a windres step.
+fn enable_dpi_awareness() {
+    use winapi::shared::windef::DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2;
+    use winapi::um::winuser::{SetProcessDPIAware, SetProcessDpiAwarenessContext};
+
+    unsafe {
+        if SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) == 0 {
+            // Pre-1703 Windows 10: fall back to system-wide awareness
+            SetProcessDPIAware();
+        }
+    }
+}
+
 fn main() {
     attach_parent_console();
+    install_panic_hook();
+    enable_dpi_awareness();
 
     let current_exe = env::current_exe()
         .expect("Failed to get current executable path");
@@ -145,7 +183,7 @@ fn main() {
             match windmenu_daemon.start() {
                 Ok(()) => {
                     println!("windmenu is now running in the background");
-                    println!("Press Win+Space to activate menu");
+                    println!("Press Ctrl+Alt+Space to activate menu");
                     println!("Use 'windmenu daemon stop' to stop the daemon");
                 }
                 Err(DaemonError::AlreadyRunning) => {
@@ -166,7 +204,7 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
             match daemon.start() {
                 Ok(()) => {
                     println!("windmenu is now running in the background");
-                    println!("Press Win+Space to activate menu");
+                    println!("Press Ctrl+Alt+Space to activate menu");
                     println!("Use 'windmenu daemon stop' to stop the daemon");
                 }
                 Err(DaemonError::AlreadyRunning) => {
@@ -195,7 +233,7 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
             match daemon.restart() {
                 Ok(()) => {
                     println!("windmenu daemon restarted successfully");
-                    println!("Press Win+Space to activate menu");
+                    println!("Press Ctrl+Alt+Space to activate menu");
                 }
                 Err(err) => {
                     eprintln!("Failed to restart windmenu daemon: {}", err);

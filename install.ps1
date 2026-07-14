@@ -86,7 +86,7 @@ Write-Host ""
 Write-Host "To get started, run:" -ForegroundColor Cyan
 Write-Host "  windmenu daemon start" -ForegroundColor White
 Write-Host ""
-Write-Host "Then press Win+Space to launch the menu." -ForegroundColor Cyan
+Write-Host "Then press Ctrl+Alt+Space to launch the menu." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Optional:" -ForegroundColor Cyan
 Write-Host "  windmenu daemon enable user-folder # auto-start on login" -ForegroundColor White

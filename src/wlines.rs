@@ -9,8 +9,9 @@ use std::os::windows::ffi::OsStrExt;
 use std::ptr;
 
 use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
-use winapi::shared::windef::{COLORREF, HBITMAP, HDC, HFONT, HWND, RECT, HBRUSH, HMENU};
+use winapi::shared::windef::{COLORREF, HBITMAP, HDC, HFONT, HWND, POINT, RECT, HBRUSH, HMENU};
 use winapi::um::errhandlingapi::GetLastError;
+use winapi::um::shellscalingapi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI};
 use winapi::um::wingdi::{
     BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateFontW, DeleteDC, DeleteObject,
     GetStockObject, Rectangle, SelectObject, SetBkColor, SetBkMode, SetDCBrushColor,
@@ -19,13 +20,16 @@ use winapi::um::wingdi::{
 use winapi::um::winuser::{
     AttachThreadInput, BeginPaint, BringWindowToTop, CallWindowProcW, CreateWindowExW,
     DefWindowProcW, DestroyWindow, DispatchMessageW, DrawTextW, EndPaint, GetForegroundWindow,
-    GetKeyState, GetMessageW, GetSystemMetrics, GetWindowLongPtrW, GetWindowLongW,
+    GetCursorPos, GetKeyState, GetMessageW, GetMonitorInfoW, GetSystemMetrics,
+    GetWindowLongPtrW, GetWindowLongW,
     GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, KillTimer, LoadCursorW,
-    PostQuitMessage, RedrawWindow, RegisterClassExW, SendMessageW, SetFocus, SetForegroundWindow,
+    MonitorFromPoint, PostQuitMessage, RedrawWindow, RegisterClassExW, SendMessageW, SetFocus,
+    SetForegroundWindow,
     SetTimer, SetWindowLongPtrW, SetWindowLongW, SetWindowTextW, ShowWindow, TranslateMessage,
     UpdateWindow, COLOR_WINDOW, DT_CALCRECT, DT_END_ELLIPSIS, DT_NOCLIP, DT_NOPREFIX,
     EC_LEFTMARGIN, EC_RIGHTMARGIN, EM_GETSEL, EM_SETMARGINS, EM_SETSEL, ES_AUTOHSCROLL,
-    ES_AUTOVSCROLL, ES_LEFT, GWLP_USERDATA, GWLP_WNDPROC, GWL_STYLE, IDC_ARROW, MSG,
+    ES_AUTOVSCROLL, ES_LEFT, GWLP_USERDATA, GWLP_WNDPROC, GWL_STYLE, IDC_ARROW,
+    MONITORINFO, MONITOR_DEFAULTTONEAREST, MSG,
     RDW_INVALIDATE, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE, SW_SHOW, VK_CONTROL, VK_DOWN, VK_END,
     VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR, VK_RETURN, VK_SHIFT, VK_UP, WM_CHAR,
     WM_CLOSE, WM_CTLCOLOREDIT, WM_KEYDOWN, WM_KEYUP, WM_KILLFOCUS, WM_LBUTTONDOWN,
@@ -120,6 +124,7 @@ struct Entry {
 
 struct State {
     settings: Settings,
+    monitor_rect: RECT,
     font: HFONT,
     main_wnd: HWND,
     edit_wnd: HWND,
@@ -551,18 +556,19 @@ unsafe fn create_window(state: &mut State) -> Result<(), String> {
         }
     }
 
-    // Window geometry
-    let display_width = GetSystemMetrics(SM_CXSCREEN);
-    let display_height = GetSystemMetrics(SM_CYSCREEN);
+    // Window geometry (monitor under the cursor)
+    let mon = state.monitor_rect;
+    let display_width = mon.right - mon.left;
+    let display_height = mon.bottom - mon.top;
 
     state.width = if state.settings.width > 0 { state.settings.width } else { display_width };
     state.height = state.settings.font_size * (state.line_count as i32 + 1)
             + state.settings.padding * 2;
 
-    let (mut x, mut y) = (0, 0);
+    let (mut x, mut y) = (mon.left, mon.top);
     if state.settings.center_window {
-        x = (display_width - state.width) / 2;
-        y = (display_height - state.height) / 2;
+        x = mon.left + (display_width - state.width) / 2;
+        y = mon.top + (display_height - state.height) / 2;
     }
 
     let title = to_wide("wlines");
@@ -630,12 +636,51 @@ unsafe fn create_window(state: &mut State) -> Result<(), String> {
     Ok(())
 }
 
+/// Bounds and effective DPI of the monitor under the cursor. The menu opens
+/// there, dmenu-style, instead of always on the primary display.
+unsafe fn cursor_monitor() -> (RECT, u32) {
+    let mut pt = POINT { x: 0, y: 0 };
+    GetCursorPos(&mut pt);
+    let monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+
+    let mut info: MONITORINFO = mem::zeroed();
+    info.cbSize = mem::size_of::<MONITORINFO>() as u32;
+    let rect = if GetMonitorInfoW(monitor, &mut info) != 0 {
+        info.rcMonitor
+    } else {
+        RECT {
+            left: 0,
+            top: 0,
+            right: GetSystemMetrics(SM_CXSCREEN),
+            bottom: GetSystemMetrics(SM_CYSCREEN),
+        }
+    };
+
+    let (mut dpi_x, mut dpi_y) = (0u32, 0u32);
+    let dpi = if GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) == 0 {
+        dpi_x
+    } else {
+        96 // shcore unavailable (pre-8.1); sizes stay unscaled
+    };
+    let _ = dpi_y; // square pixels assumed, as everywhere on Windows
+
+    (rect, dpi)
+}
+
 unsafe fn show_inner(settings: &Settings, entries: &[String]) -> Option<String> {
     let entries: Vec<Entry> = entries.iter().map(|text| Entry {
         lower: text.to_lowercase(),
         wide: to_wide(text),
         text: text.clone(),
     }).collect();
+
+    // Config sizes are 96-DPI logical pixels; scale for the target monitor
+    let (monitor_rect, dpi) = cursor_monitor();
+    let scale = |v: i32| (v * dpi as i32 + 48) / 96;
+    let mut settings = settings.clone();
+    settings.font_size = scale(settings.font_size);
+    settings.padding = scale(settings.padding);
+    settings.width = scale(settings.width);
 
     let font_name = to_wide(&settings.font_name);
     let font = CreateFontW(settings.font_size, 0, 0, 0,
@@ -655,7 +700,8 @@ unsafe fn show_inner(settings: &Settings, entries: &[String]) -> Option<String> 
 
     let mut state = Box::new(State {
         prompt_wide: settings.prompt.as_deref().map(to_wide),
-        settings: settings.clone(),
+        settings,
+        monitor_rect,
         font,
         main_wnd: ptr::null_mut(),
         edit_wnd: ptr::null_mut(),
