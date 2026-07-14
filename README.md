@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 ## Features
 
 - Fast application launcher via hotkey (Win+Space is default)
-- Vim-like navigation (hjkl) alongside arrow keys
+- Vim-like navigation (Ctrl+J/K) alongside arrow keys
 - Scans Windows Start Menu shortcuts automatically
 - Supports custom commands via configuration
 - Key combination commands - trigger keyboard shortcuts from the menu

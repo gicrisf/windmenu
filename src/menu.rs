@@ -17,7 +17,7 @@ use winapi::um::winuser::{
     DispatchMessageW, MessageBoxW, MsgWaitForMultipleObjects, PeekMessageW, RegisterHotKey,
     SendInput, TranslateMessage, INPUT, INPUT_KEYBOARD, MB_ICONERROR, MB_OK, MOD_ALT,
     MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN, MSG, PM_REMOVE, QS_ALLINPUT,
-    SW_RESTORE, WM_HOTKEY, WM_QUIT, KEYBDINPUT, KEYEVENTF_KEYUP,
+    SW_RESTORE, WM_HOTKEY, KEYBDINPUT, KEYEVENTF_KEYUP,
     VK_MENU, VK_SHIFT, VK_CAPITAL, VK_CONTROL, VK_TAB, VK_ESCAPE, VK_LWIN, VK_SPACE,
     VK_RETURN, VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5,
     VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_OEM_COMMA, VK_OEM_PERIOD,
@@ -253,9 +253,6 @@ impl Hotkey {
 
                 if result == WAIT_OBJECT_0 + 1 {
                     while PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
-                        if msg.message == WM_QUIT {
-                            break;
-                        }
                         if msg.message == WM_HOTKEY && msg.wParam == Self::HOTKEY_ID as usize {
                             callback();
                         }

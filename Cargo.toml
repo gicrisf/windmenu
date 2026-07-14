@@ -7,6 +7,10 @@ edition = "2021"
 name = "windmenu"
 path = "src/main.rs"
 
+[profile.release]
+panic = "abort"
+strip = true
+lto = true
 
 [dependencies]
 clap = { version = "4.5.48", features = ["derive"] }

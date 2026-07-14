@@ -2,7 +2,9 @@ name: Build
 
 on:
   push:
+    branches: [ main ]
     tags: [ 'v*' ]
+  pull_request:
   workflow_dispatch:
 
 env:
@@ -25,10 +27,10 @@ jobs:
     - name: Install build dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-mingw-w64-x86-64 nsis curl jq unzip
-    
+        sudo apt-get install -y gcc-mingw-w64-x86-64 nsis zip
+
     - name: Cache cargo dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
@@ -42,15 +44,6 @@ jobs:
     - name: Run build installer script
       run: ./build-installer.sh
 
-    - name: Verify wlines-daemon.exe exists
-      run: |
-        if [ ! -f "assets/wlines-daemon.exe" ]; then
-          echo "ERROR: wlines-daemon.exe not found in assets directory!"
-          echo "WindMenu requires wlines-daemon.exe to function properly."
-          exit 1
-        fi
-        echo "✓ wlines-daemon.exe found"
-    
     - name: Verify build outputs
       run: |
         if [ ! -f "windmenu-installer.exe" ]; then
@@ -70,7 +63,6 @@ jobs:
       run: |
         mkdir -p release-portable
         cp target/x86_64-pc-windows-gnu/release/windmenu.exe release-portable/
-        cp assets/wlines-daemon.exe release-portable/
         cp windmenu.toml release-portable/
         cp README.md release-portable/
         cp LICENSE release-portable/

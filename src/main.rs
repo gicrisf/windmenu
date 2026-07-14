@@ -22,7 +22,7 @@ use menu::Menu;
 
 #[derive(Parser)]
 #[command(name = "windmenu")]
-#[command(version = "0.6.0")]
+#[command(version)] // taken from Cargo.toml
 #[command(about = "WINdows DMENU-like launcher")]
 struct Cli {
     /// Run as background daemon process (internal)
