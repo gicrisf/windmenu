@@ -108,10 +108,68 @@ fn attach_parent_console() {
     use winapi::um::wincon::{AttachConsole, ATTACH_PARENT_PROCESS};
 
     unsafe {
-        if GetStdHandle(STD_OUTPUT_HANDLE).is_null() {
-            AttachConsole(ATTACH_PARENT_PROCESS);
+        if GetStdHandle(STD_OUTPUT_HANDLE).is_null()
+            && AttachConsole(ATTACH_PARENT_PROCESS) != 0
+        {
+            CONSOLE_ATTACHED.store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
+}
+
+static CONSOLE_ATTACHED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// The shell prints its prompt without waiting for a GUI-subsystem exe, so our
+/// output lands below the prompt and the cursor is left stranded — it looks
+/// hung until the user presses Enter. Inject one Enter into the console input
+/// buffer so the shell redraws its prompt after our output.
+fn release_parent_console() {
+    use std::io::Write;
+    use winapi::um::fileapi::{CreateFileW, OPEN_EXISTING};
+    use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
+    use winapi::um::wincon::{WriteConsoleInputW, INPUT_RECORD, KEY_EVENT};
+    use winapi::um::winnt::{FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE};
+    use winapi::um::winuser::VK_RETURN;
+
+    if !CONSOLE_ATTACHED.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    let _ = std::io::stdout().flush();
+    let _ = std::io::stderr().flush();
+
+    unsafe {
+        let name: Vec<u16> = "CONIN$\0".encode_utf16().collect();
+        let conin = CreateFileW(
+            name.as_ptr(),
+            GENERIC_READ | GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            std::ptr::null_mut(),
+            OPEN_EXISTING,
+            0,
+            std::ptr::null_mut(),
+        );
+        if conin == INVALID_HANDLE_VALUE {
+            return;
+        }
+        let mut record: INPUT_RECORD = std::mem::zeroed();
+        record.EventType = KEY_EVENT;
+        {
+            let key = record.Event.KeyEvent_mut();
+            key.bKeyDown = 1;
+            key.wRepeatCount = 1;
+            key.wVirtualKeyCode = VK_RETURN as u16;
+            *key.uChar.UnicodeChar_mut() = '\r' as u16;
+        }
+        let mut written = 0;
+        WriteConsoleInputW(conin, &record, 1, &mut written);
+        CloseHandle(conin);
+    }
+}
+
+/// Exit a CLI code path, first waking the parent shell's prompt.
+fn cli_exit(code: i32) -> ! {
+    release_parent_console();
+    std::process::exit(code);
 }
 
 /// Surface panics in a message box: with panic = "abort", a GUI subsystem and
@@ -157,7 +215,12 @@ fn main() {
 
     let current_exe = env::current_exe()
         .expect("Failed to get current executable path");
-    let cli = Cli::parse();
+    // try_parse instead of parse: clap's built-in exit on --help/--version
+    // would skip the prompt-waking in cli_exit
+    let cli = Cli::try_parse().unwrap_or_else(|e| {
+        let _ = e.print();
+        cli_exit(e.exit_code());
+    });
 
     // Resolve stable windmenu path: prefer PATH (Scoop shim) over resolved current_exe
     let windmenu_path = find_on_path("windmenu.exe")
@@ -191,11 +254,13 @@ fn main() {
                 }
                 Err(err) => {
                     eprintln!("Failed to start windmenu daemon: {}", err);
-                    std::process::exit(1);
+                    cli_exit(1);
                 }
             }
         }
     }
+
+    release_parent_console();
 }
 
 fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
@@ -212,7 +277,7 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
                 }
                 Err(err) => {
                     eprintln!("Failed to start windmenu daemon: {}", err);
-                    std::process::exit(1);
+                    cli_exit(1);
                 }
             }
         }
@@ -237,7 +302,7 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
                 }
                 Err(err) => {
                     eprintln!("Failed to restart windmenu daemon: {}", err);
-                    std::process::exit(1);
+                    cli_exit(1);
                 }
             }
         }
@@ -253,7 +318,7 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
                 }
                 Err(err) => {
                     eprintln!("Failed to enable windmenu daemon startup method '{}': {}", method, err);
-                    std::process::exit(1);
+                    cli_exit(1);
                 }
             }
         }
@@ -276,7 +341,7 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
                 }
             }
             if failed {
-                std::process::exit(1);
+                cli_exit(1);
             }
         }
     }
