@@ -36,22 +36,12 @@ enum Commands {
     /// Daemon management commands
     Daemon {
         #[command(subcommand)]
-        daemon_type: DaemonType,
+        action: DaemonAction,
     },
     /// Test utilities
     Test {
         #[command(subcommand)]
         test_type: TestType,
-    },
-}
-
-#[derive(Subcommand)]
-enum DaemonType {
-    /// Windmenu daemon operations
-    #[command(name = "self")]
-    Self_ {
-        #[command(subcommand)]
-        action: DaemonAction,
     },
 }
 
@@ -130,8 +120,8 @@ fn main() {
     }
 
     match cli.command {
-        Some(Commands::Daemon { daemon_type }) => {
-            handle_daemon_command(daemon_type, &windmenu_daemon);
+        Some(Commands::Daemon { action }) => {
+            handle_daemon_action(action, &windmenu_daemon);
         }
         Some(Commands::Test { test_type }) => {
             handle_test_command(test_type);
@@ -142,7 +132,7 @@ fn main() {
                 Ok(()) => {
                     println!("windmenu is now running in the background");
                     println!("Press Win+Space to activate menu");
-                    println!("Use 'windmenu daemon self stop' to stop the daemon");
+                    println!("Use 'windmenu daemon stop' to stop the daemon");
                 }
                 Err(DaemonError::AlreadyRunning) => {
                     println!("windmenu daemon is already running");
@@ -156,32 +146,20 @@ fn main() {
     }
 }
 
-fn handle_daemon_command(daemon_type: DaemonType, windmenu_daemon: &WindmenuDaemon) {
-    match daemon_type {
-        DaemonType::Self_ { action } => {
-            handle_daemon_action(action, windmenu_daemon, "windmenu");
-        }
-    }
-}
-
-fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T, daemon_name: &str) {
+fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
     match action {
         DaemonAction::Start => {
             match daemon.start() {
                 Ok(()) => {
-                    if daemon_name == "windmenu" {
-                        println!("windmenu is now running in the background");
-                        println!("Press Win+Space to activate menu");
-                        println!("Use 'windmenu daemon self stop' to stop the daemon");
-                    } else {
-                        println!("{} daemon started successfully", daemon_name);
-                    }
+                    println!("windmenu is now running in the background");
+                    println!("Press Win+Space to activate menu");
+                    println!("Use 'windmenu daemon stop' to stop the daemon");
                 }
                 Err(DaemonError::AlreadyRunning) => {
-                    println!("{} daemon is already running", daemon_name);
+                    println!("windmenu daemon is already running");
                 }
                 Err(err) => {
-                    eprintln!("Failed to start {} daemon: {}", daemon_name, err);
+                    eprintln!("Failed to start windmenu daemon: {}", err);
                     std::process::exit(1);
                 }
             }
@@ -189,44 +167,40 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T, daemon_name
         DaemonAction::Stop => {
             match daemon.stop() {
                 Ok(()) => {
-                    println!("{} daemon stopped successfully", daemon_name);
+                    println!("windmenu daemon stopped successfully");
                 }
                 Err(DaemonError::NotRunning) => {
-                    println!("No {} daemon was running", daemon_name);
+                    println!("No windmenu daemon was running");
                 }
                 Err(err) => {
-                    eprintln!("Failed to stop {} daemon: {}", daemon_name, err);
+                    eprintln!("Failed to stop windmenu daemon: {}", err);
                 }
             }
         }
         DaemonAction::Restart => {
             match daemon.restart() {
                 Ok(()) => {
-                    if daemon_name == "windmenu" {
-                        println!("windmenu daemon restarted successfully");
-                        println!("Press Win+Space to activate menu");
-                    } else {
-                        println!("{} daemon restarted successfully", daemon_name);
-                    }
+                    println!("windmenu daemon restarted successfully");
+                    println!("Press Win+Space to activate menu");
                 }
                 Err(err) => {
-                    eprintln!("Failed to restart {} daemon: {}", daemon_name, err);
+                    eprintln!("Failed to restart windmenu daemon: {}", err);
                     std::process::exit(1);
                 }
             }
         }
         DaemonAction::Status => {
             let status = daemon.get_status();
-            println!("{} daemon status:", daemon_name);
+            println!("windmenu daemon status:");
             print!("{}", status);
         }
         DaemonAction::Enable { method } => {
             match daemon.enable_startup(&method) {
                 Ok(()) => {
-                    println!("{} daemon startup method '{}' enabled successfully", daemon_name, method);
+                    println!("windmenu daemon startup method '{}' enabled successfully", method);
                 }
                 Err(err) => {
-                    eprintln!("Failed to enable {} daemon startup method '{}': {}", daemon_name, method, err);
+                    eprintln!("Failed to enable windmenu daemon startup method '{}': {}", method, err);
                     std::process::exit(1);
                 }
             }
@@ -234,10 +208,10 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T, daemon_name
         DaemonAction::Disable { method } => {
             match daemon.disable_startup(&method) {
                 Ok(()) => {
-                    println!("{} daemon startup method '{}' disabled successfully", daemon_name, method);
+                    println!("windmenu daemon startup method '{}' disabled successfully", method);
                 }
                 Err(err) => {
-                    eprintln!("Failed to disable {} daemon startup method '{}': {}", daemon_name, method, err);
+                    eprintln!("Failed to disable windmenu daemon startup method '{}': {}", method, err);
                     std::process::exit(1);
                 }
             }

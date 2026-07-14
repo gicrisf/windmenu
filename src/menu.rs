@@ -169,8 +169,6 @@ struct MenuConfig {
     theme: Option<WlinesTheme>,
     commands: Option<Vec<CommandConfig>>,
     hotkey: Option<Vec<String>>, // Custom hotkey keys (e.g., ["WIN", "SPACE"])
-    wlines_cli_path: Option<String>, // Path to wlines.exe for direct execution
-    hotkey_poll_interval: Option<u64>, // Hotkey polling interval in milliseconds
 }
 
 impl MenuConfig {
@@ -325,18 +323,9 @@ impl Menu {
             if let Some(ref theme) = &cfg.theme {
                 settings = theme.to_settings();
             }
-            // wlines_cli_path is obsolete: the renderer is now built in
-            if cfg.wlines_cli_path.is_some() {
-                eprintln!("Warning: 'wlines_cli_path' in windmenu.toml is no longer used; the menu renderer is built into windmenu");
-            }
             // Update hotkey keys from config
             if let Some(ref keys) = &cfg.hotkey {
                 hotkey.keys = keys.clone();
-            }
-            // hotkey_poll_interval is obsolete: hotkeys are registered with
-            // Windows (RegisterHotKey) instead of polled
-            if cfg.hotkey_poll_interval.is_some() {
-                eprintln!("Warning: 'hotkey_poll_interval' in windmenu.toml is no longer used; the hotkey is registered with Windows instead of polled");
             }
             // Key commands
             if let Some(config_commands) = cfg.commands {

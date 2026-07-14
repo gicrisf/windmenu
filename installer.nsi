@@ -44,7 +44,7 @@ RequestExecutionLevel user
 
 ; Finish page
 !define MUI_FINISHPAGE_RUN "$INSTDIR\windmenu.exe"
-!define MUI_FINISHPAGE_RUN_PARAMETERS "daemon self start"
+!define MUI_FINISHPAGE_RUN_PARAMETERS "daemon start"
 !define MUI_FINISHPAGE_RUN_TEXT "Start Windmenu Daemon"
 !insertmacro MUI_PAGE_FINISH
 
@@ -99,7 +99,7 @@ SectionGroupEnd
 
 SectionGroup /e "Auto-start Options" SecGrpAutoStart
 Section /o "Registry Run (Basic)" SecAutoStartRegistry
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" '"$INSTDIR\windmenu.exe" daemon self start'
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" '"$INSTDIR\windmenu.exe" daemon start'
 SectionEnd
 
 Section /o "Task Scheduler (Admin)" SecAutoStartTask
@@ -160,7 +160,7 @@ Section /o "Task Scheduler (Admin)" SecAutoStartTask
   FileWrite $0 '  <Actions Context="Author">$\r$\n'
   FileWrite $0 '    <Exec>$\r$\n'
   FileWrite $0 '      <Command>$INSTDIR\windmenu.exe</Command>$\r$\n'
-  FileWrite $0 '      <Arguments>daemon self start</Arguments>$\r$\n'
+  FileWrite $0 '      <Arguments>daemon start</Arguments>$\r$\n'
   FileWrite $0 '      <WorkingDirectory>$INSTDIR</WorkingDirectory>$\r$\n'
   FileWrite $0 '    </Exec>$\r$\n'
   FileWrite $0 '  </Actions>$\r$\n'
@@ -184,7 +184,7 @@ Section /o "Current User Startup Folder" SecAutoStartUser
   ; Create VBS script for silent startup
   FileOpen $0 "$INSTDIR\start-windmenu-user.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon self start", 0, False$\r$\n'
+  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon start", 0, False$\r$\n'
   FileClose $0
 
   ; Copy to user startup folder
@@ -195,7 +195,7 @@ Section /o "All Users Startup Folder" SecAutoStartAll
   ; Create VBS script for silent startup
   FileOpen $0 "$INSTDIR\start-windmenu-all.vbs" w
   FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon self start", 0, False$\r$\n'
+  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon start", 0, False$\r$\n'
   FileClose $0
 
   ; Copy to all users startup folder (requires admin privileges)
@@ -233,7 +233,6 @@ Section Uninstall
   
   ; Remove files and uninstaller
   Delete "$INSTDIR\windmenu.exe"
-  Delete "$INSTDIR\wlines-daemon.exe"
   Delete "$INSTDIR\start-windmenu-user.vbs"
   Delete "$INSTDIR\start-windmenu-all.vbs"
   Delete "$INSTDIR\uninstall.exe"

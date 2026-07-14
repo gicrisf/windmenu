@@ -3,12 +3,12 @@
 The menu renderer is now a native Rust module inside `windmenu.exe` — a full port of the wlines C renderer. The two-process design (windmenu.exe + wlines-daemon.exe over a named pipe, with wlines.exe CLI fallback) is gone, and with it the main source of instability: pipe races, daemon lifecycle detection, and silent fallback paths.
 
 - One executable, nothing to fetch: `windmenu fetch` and the bundled `wlines-daemon.exe` are removed
-- `windmenu daemon wlines ...` and `windmenu daemon all ...` subcommands removed; use `windmenu daemon self ...`
-- Config keys `wlines_daemon_path` and `wlines_cli_path` are obsolete (a warning is printed if present); `wlines-config.txt` is no longer generated
+- The daemon CLI is flattened: `windmenu daemon <start|stop|restart|status|enable|disable>`. The `self`, `wlines`, and `all` subcommands are gone since there is only one daemon now
+- Config keys `wlines_daemon_path` and `wlines_cli_path` are removed and silently ignored; `wlines-config.txt` is no longer generated
 - Each hotkey press opens a fresh menu window in-process — no stale daemon state, no orphaned renderer processes
 - `filter_mode` values are `complete` or `keywords` (as in wlines; the previously documented `fuzzy`/`substring` values never existed and fell back to `complete`)
 - Upgraders: remove old wlines-daemon auto-start entries (see "Upgrading from 0.5.x" in the README)
-- Hotkey detection now uses `RegisterHotKey` (event-driven, no idle CPU, no missed or repeated triggers) instead of a 50ms `GetAsyncKeyState` poll loop. Hotkeys must be any number of modifiers (WIN/CTRL/ALT/SHIFT) plus exactly one other key; if registration fails (combo taken by another app), the daemon shows an error dialog and exits instead of silently misbehaving. `hotkey_poll_interval` is obsolete (a warning is printed if present)
+- Hotkey detection now uses `RegisterHotKey` (event-driven, no idle CPU, no missed or repeated triggers) instead of a 50ms `GetAsyncKeyState` poll loop. Hotkeys must be any number of modifiers (WIN/CTRL/ALT/SHIFT) plus exactly one other key; if registration fails (combo taken by another app), the daemon shows an error dialog and exits instead of silently misbehaving. The `hotkey_poll_interval` config key is removed and silently ignored
 
 ## Bug Fixes
 

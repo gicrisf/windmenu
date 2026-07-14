@@ -34,7 +34,7 @@ scoop install windmenu
 
 ### Option 3: Direct Download
 
-Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe daemon self start`.
+Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe daemon start`.
 
 Press `Win+Space` to launch.
 
@@ -43,10 +43,10 @@ Press `Win+Space` to launch.
 To have windmenu start automatically when you log in:
 
 ```powershell
-windmenu daemon self enable task
+windmenu daemon enable task
 ```
 
-For Scoop installs, use `task` or `user-folder` methods to avoid a brief terminal flash caused by the Scoop shim. See all available methods with `windmenu daemon self enable --help`.
+For Scoop installs, use `task` or `user-folder` methods to avoid a brief terminal flash caused by the Scoop shim. See all available methods with `windmenu daemon enable --help`.
 
 ### Customizing the Hotkey
 
@@ -198,14 +198,14 @@ cargo build --release
 First, stop the daemon and remove auto-startup entries, otherwise the system will try to launch something that no longer exists at the next startup:
 
 ```powershell
-windmenu daemon self stop
-windmenu daemon self disable
+windmenu daemon stop
+windmenu daemon disable
 ```
 
 Check the situation with
 
 ``` powershell
-windmenu daemon self status
+windmenu daemon status
 ```
 
 If no instance is running and no startup configuration is still enabled, proceed by removing the binaries. If installed via Scoop:
@@ -222,7 +222,7 @@ Since 0.6.0 the menu renderer is built into `windmenu.exe`; the separate `wlines
 
 1. Remove any auto-start entries for the old wlines daemon (with the **old** binary: `windmenu daemon wlines disable <method>`, or delete them manually from `HKCU\...\Run` / Task Scheduler / the Startup folder).
 2. Stop and delete any leftover `wlines-daemon.exe`.
-3. The `wlines_daemon_path` / `wlines_cli_path` config keys and the generated `wlines-config.txt` file are no longer used; the `windmenu fetch` and `windmenu daemon wlines|all` commands were removed (use `windmenu daemon self ...`).
+3. The `wlines_daemon_path` / `wlines_cli_path` config keys and the generated `wlines-config.txt` file are no longer used; the `windmenu fetch` and `windmenu daemon wlines|all` commands were removed (use `windmenu daemon ...`).
 
 ## Troubleshooting
 
@@ -231,7 +231,7 @@ Since 0.6.0 the menu renderer is built into `windmenu.exe`; the separate `wlines
 The `task` method uses `schtasks.exe`, which may fail if your account lacks permission to create scheduled tasks. If you get an access denied error, try `user-folder` instead:
 
 ```powershell
-windmenu daemon self enable user-folder
+windmenu daemon enable user-folder
 ```
 
 This places a VBS wrapper in your Startup folder and requires no special privileges.
@@ -241,8 +241,8 @@ This places a VBS wrapper in your Startup folder and requires no special privile
 If you installed via Scoop and enabled auto-startup with the `registry` method, you may see a console window flash briefly when Windows launches the Scoop shim. Switch to `task` or `user-folder` to avoid this:
 
 ```powershell
-windmenu daemon self disable
-windmenu daemon self enable user-folder
+windmenu daemon disable
+windmenu daemon enable user-folder
 ```
 
 ### Configuration not being read
