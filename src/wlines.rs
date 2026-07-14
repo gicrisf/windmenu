@@ -46,12 +46,14 @@ const DRAWTEXT_PARAMS: UINT = DT_NOCLIP | DT_NOPREFIX | DT_END_ELLIPSIS;
 pub enum FilterMode {
     Complete,
     Keywords,
+    Fuzzy,
 }
 
 impl FilterMode {
     pub fn parse(s: &str) -> FilterMode {
         match s.to_ascii_lowercase().as_str() {
             "keywords" | "1" => FilterMode::Keywords,
+            "fuzzy" | "2" => FilterMode::Fuzzy,
             _ => FilterMode::Complete,
         }
     }
@@ -205,6 +207,99 @@ fn filter_reduce(state: &mut State, needle: &str) {
     }
 }
 
+/// fzf-style subsequence scorer. Returns None when `needle` is not a
+/// subsequence of `haystack`, otherwise the score of the best-scoring
+/// alignment (dynamic programming, not greedy first-occurrence), favoring
+/// matches at word boundaries and camelCase humps, consecutive runs, and
+/// short gaps. Leading and trailing gaps are free.
+fn fuzzy_score(needle: &str, haystack: &str, case_sensitive: bool) -> Option<i32> {
+    const SCORE_MATCH: i32 = 16;
+    const BONUS_BOUNDARY: i32 = 16;
+    const BONUS_CAMEL: i32 = 12;
+    const BONUS_CONSECUTIVE: i32 = 8;
+    const PENALTY_GAP_START: i32 = -3;
+    const PENALTY_GAP_EXTEND: i32 = -1;
+    const UNMATCHED: i32 = i32::MIN / 2; // headroom so additions can't overflow
+
+    fn is_camel(prev: char, cur: char) -> bool {
+        (prev.is_lowercase() && cur.is_uppercase())
+            || (prev.is_alphabetic() && cur.is_numeric())
+    }
+
+    if needle.is_empty() {
+        return Some(0);
+    }
+    let hay: Vec<char> = haystack.chars().collect();
+
+    // Positional bonus for a match at each haystack index
+    let bonus: Vec<i32> = hay
+        .iter()
+        .enumerate()
+        .map(|(j, &c)| match if j == 0 { None } else { Some(hay[j - 1]) } {
+            None => BONUS_BOUNDARY,
+            Some(p) if !p.is_alphanumeric() => BONUS_BOUNDARY,
+            Some(p) if is_camel(p, c) => BONUS_CAMEL,
+            _ => 0,
+        })
+        .collect();
+
+    let matches = |nc: char, hc: char| {
+        if case_sensitive {
+            hc == nc
+        } else {
+            hc.to_lowercase().eq(nc.to_lowercase())
+        }
+    };
+
+    // ending[j]: best score matching the needle prefix so far with its last
+    // char matched exactly at haystack index j
+    let mut ending = vec![UNMATCHED; hay.len()];
+    let mut first_row = true;
+    for nc in needle.chars() {
+        let mut next = vec![UNMATCHED; hay.len()];
+        // Best previous-row score ending strictly before j-1, with affine gap
+        // penalties applied for the unmatched span up to j-1
+        let mut gapped = UNMATCHED;
+        for (j, &hc) in hay.iter().enumerate() {
+            if matches(nc, hc) {
+                if first_row {
+                    next[j] = SCORE_MATCH + bonus[j];
+                } else {
+                    let diag = if j > 0 { ending[j - 1] } else { UNMATCHED };
+                    let best = (diag + BONUS_CONSECUTIVE).max(gapped);
+                    if best > UNMATCHED {
+                        next[j] = best + SCORE_MATCH + bonus[j];
+                    }
+                }
+            }
+            if j > 0 {
+                gapped = (gapped + PENALTY_GAP_EXTEND).max(ending[j - 1] + PENALTY_GAP_START);
+            }
+        }
+        ending = next;
+        first_row = false;
+    }
+
+    let best = ending.into_iter().max()?;
+    if best > UNMATCHED / 2 { Some(best) } else { None }
+}
+
+fn filter_fuzzy(state: &mut State, needle: &str) {
+    if needle.is_empty() {
+        return;
+    }
+    let case_sensitive = state.settings.case_sensitive;
+    let entries = &state.entries;
+    let mut scored: Vec<(i32, usize)> = state
+        .search_results
+        .iter()
+        .filter_map(|&i| fuzzy_score(needle, &entries[i].text, case_sensitive).map(|s| (s, i)))
+        .collect();
+    // Descending by score, original entry order as tie-break
+    scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+    state.search_results = scored.into_iter().map(|(_, i)| i).collect();
+}
+
 unsafe fn update_search_results(state: &mut State) {
     state.search_results = (0..state.entries.len()).collect();
 
@@ -216,6 +311,7 @@ unsafe fn update_search_results(state: &mut State) {
                 filter_reduce(state, word);
             }
         }
+        FilterMode::Fuzzy => filter_fuzzy(state, &query),
     }
 
     state.selected = if state.search_results.is_empty() { None } else { Some(0) };
@@ -750,4 +846,73 @@ unsafe fn show_inner(settings: &Settings, entries: &[String]) -> Option<String> 
     DeleteObject(state.font as _);
 
     state.result.take()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fuzzy_score;
+
+    #[test]
+    fn non_subsequence_rejected() {
+        assert_eq!(fuzzy_score("xyz", "Google Chrome", false), None);
+        assert_eq!(fuzzy_score("chromee", "Chrome", false), None);
+    }
+
+    #[test]
+    fn empty_needle_matches_everything() {
+        assert_eq!(fuzzy_score("", "anything", false), Some(0));
+    }
+
+    #[test]
+    fn case_insensitive_by_default() {
+        assert!(fuzzy_score("chrome", "Google Chrome", false).is_some());
+        assert_eq!(fuzzy_score("chrome", "Google Chrome", true), None);
+        assert!(fuzzy_score("Chrome", "Google Chrome", true).is_some());
+    }
+
+    #[test]
+    fn boundary_match_beats_mid_word_match() {
+        let boundary = fuzzy_score("code", "Visual Studio Code", false).unwrap();
+        let mid_word = fuzzy_score("code", "Unicodex", false).unwrap();
+        assert!(boundary > mid_word);
+    }
+
+    #[test]
+    fn consecutive_run_beats_scattered_match() {
+        let run = fuzzy_score("term", "Terminal", false).unwrap();
+        let scattered = fuzzy_score("term", "Text Formatter", false).unwrap();
+        assert!(run > scattered);
+    }
+
+    #[test]
+    fn camel_hump_scores_above_plain_mid_word() {
+        let camel = fuzzy_score("pp", "PowerPoint", false).unwrap();
+        let plain = fuzzy_score("pp", "clipper", false).unwrap();
+        assert!(camel > plain);
+    }
+
+    #[test]
+    fn acronym_style_matching_works() {
+        // Classic fzf use case: initials of a multi-word entry beat a
+        // scattered mid-word match
+        let acronym = fuzzy_score("vsc", "Visual Studio Code", false).unwrap();
+        let scattered = fuzzy_score("vsc", "vesicular", false).unwrap();
+        assert!(acronym > scattered);
+    }
+
+    #[test]
+    fn picks_best_alignment_not_first_occurrence() {
+        // Greedy matching would take the 's' in "Visual" and miss the
+        // word-boundary 'S' of "Studio"; the DP must find the better path
+        let boundary = fuzzy_score("st", "Visual Studio", false).unwrap();
+        let mid_word = fuzzy_score("st", "Restart", false).unwrap();
+        assert!(boundary > mid_word);
+    }
+
+    #[test]
+    fn shorter_gap_scores_higher() {
+        let short_gap = fuzzy_score("ab", "acb", false).unwrap();
+        let long_gap = fuzzy_score("ab", "acccccb", false).unwrap();
+        assert!(short_gap > long_gap);
+    }
 }

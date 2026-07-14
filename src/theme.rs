@@ -6,7 +6,7 @@ use crate::wlines::{self, FilterMode, Settings};
 pub struct WlinesTheme {
     pub lines: Option<usize>,                    // Lines to show
     pub prompt: Option<String>,                  // Prompt text
-    pub filter_mode: Option<String>,             // Filter mode (complete/keywords)
+    pub filter_mode: Option<String>,             // Filter mode (complete/keywords/fuzzy)
     pub selected_index: Option<usize>,           // Initial selected index
     pub padding_x: Option<usize>,                // Window padding
     pub width_x: Option<usize>,                  // Window width (centers the window)
