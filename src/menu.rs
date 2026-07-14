@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::ffi::OsStr;
@@ -102,8 +103,8 @@ impl EntryStore {
         self.config = config;
     }
 
-    pub(crate) fn reload_config(&mut self) {
-        if let Some((cfg, _)) = MenuConfig::load().ok() {
+    pub(crate)     fn reload_config(&mut self) {
+        if let Ok((cfg, _)) = MenuConfig::load() {
             if let Some(cmds) = cfg.commands {
                 self.apply_config_commands(cmds);
             } else {
@@ -156,7 +157,7 @@ impl EntryStore {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug)]
 pub struct Hotkey {
     keys: Vec<String>,
 }
@@ -364,7 +365,7 @@ enum CommandType {
 }
 
 pub struct Menu {
-    pub process_running: Mutex<bool>,
+    pub process_running: AtomicBool,
     pub entries: Arc<RwLock<EntryStore>>,
     pub settings: wlines::Settings,
     pub hotkey: Hotkey,
@@ -406,7 +407,7 @@ fn find_lnk_files(dir: &Path) -> std::io::Result<HashMap<String, PathBuf>> {
 
 impl Menu {
     pub fn new() -> Menu {
-        let process_running = Mutex::new(false);
+        let process_running = AtomicBool::new(false);
 
         // Ctrl+Alt+Space
         let mut hotkey = Hotkey {
@@ -436,13 +437,8 @@ impl Menu {
     }
 
     pub fn show(self: Arc<Self>) -> Result<(), MenuError> {
-        // Check and set the running flag atomically
-        {
-            let mut running = self.process_running.lock().unwrap();
-            if *running {
-                return Err(MenuError::MenuAlreadyRunning);
-            }
-            *running = true;
+        if self.process_running.swap(true, Ordering::SeqCst) {
+            return Err(MenuError::MenuAlreadyRunning);
         }
 
         let entries = self.prepare_entries();
@@ -454,8 +450,7 @@ impl Menu {
                 None => Ok(()), // User cancelled
             };
 
-            // Always reset the running flag, regardless of success or failure
-            *self.process_running.lock().unwrap() = false;
+            self.process_running.store(false, Ordering::SeqCst);
 
             // Log any errors that occurred
             if let Err(e) = result {
