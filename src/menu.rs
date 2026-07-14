@@ -434,19 +434,68 @@ pub fn config_edit() -> i32 {
     };
 
     let editor = env::var("EDITOR").unwrap_or_else(|_| "notepad.exe".to_string());
+    let mut parts = split_command(&editor);
+    if parts.is_empty() {
+        eprintln!("config edit: EDITOR is empty");
+        return 1;
+    }
+    let program = parts.remove(0);
+
     println!("Opening {} in {}", path.display(), editor);
-    match Command::new(&editor).arg(&path).spawn() {
+    match Command::new(&program).args(&parts).arg(&path).spawn() {
         Ok(mut child) => {
             let _ = child.wait();
         }
         Err(e) => {
-            eprintln!("config edit: failed to launch {}: {}", editor, e);
+            eprintln!("config edit: failed to launch {}: {}", program, e);
             return 1;
         }
     }
 
     println!("{}", RESTART_REMINDER);
     0
+}
+
+/// Split an editor command into program + arguments. Double quotes group a
+/// token so paths with spaces survive (e.g. `"C:\Program Files\x.exe" --wait`),
+/// while an unquoted, space-free command still splits on whitespace (`code
+/// --wait`). A bare unquoted path with spaces is treated as a single token,
+/// since that's the more common Windows case than an unquoted program + flags.
+fn split_command(command: &str) -> Vec<String> {
+    // If nothing looks like a flag/separator, treat the whole string as one
+    // path — this preserves unquoted "C:\Program Files\..." editor paths.
+    if !command.contains('"') && !command.contains(" -") {
+        let trimmed = command.trim();
+        return if trimmed.is_empty() { Vec::new() } else { vec![trimmed.to_string()] };
+    }
+
+    let mut tokens = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut has_token = false;
+
+    for ch in command.chars() {
+        match ch {
+            '"' => {
+                in_quotes = !in_quotes;
+                has_token = true;
+            }
+            c if c.is_whitespace() && !in_quotes => {
+                if has_token {
+                    tokens.push(std::mem::take(&mut current));
+                    has_token = false;
+                }
+            }
+            c => {
+                current.push(c);
+                has_token = true;
+            }
+        }
+    }
+    if has_token {
+        tokens.push(current);
+    }
+    tokens
 }
 
 
@@ -781,5 +830,65 @@ impl Menu {
             },
             _ => Err(MenuError::KeyParsing(key.to_string())),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_command;
+
+    #[test]
+    fn bare_program_stays_single_token() {
+        assert_eq!(split_command("notepad.exe"), vec!["notepad.exe"]);
+    }
+
+    #[test]
+    fn unquoted_path_with_spaces_stays_single_token() {
+        // The common Windows case: an editor path under "Program Files" with no
+        // quoting and no flags must not be split on its internal spaces.
+        assert_eq!(
+            split_command(r"C:\Program Files\Editor\ed.exe"),
+            vec![r"C:\Program Files\Editor\ed.exe"],
+        );
+    }
+
+    #[test]
+    fn program_with_dash_flag_splits() {
+        assert_eq!(split_command("code --wait"), vec!["code", "--wait"]);
+    }
+
+    #[test]
+    fn quoted_program_then_flag_splits_but_keeps_path() {
+        assert_eq!(
+            split_command(r#""C:\Program Files\Editor\ed.exe" --wait"#),
+            vec![r"C:\Program Files\Editor\ed.exe", "--wait"],
+        );
+    }
+
+    #[test]
+    fn quoted_path_without_flags_is_one_token() {
+        assert_eq!(
+            split_command(r#""C:\Program Files\Editor\ed.exe""#),
+            vec![r"C:\Program Files\Editor\ed.exe"],
+        );
+    }
+
+    #[test]
+    fn empty_and_whitespace_yield_no_tokens() {
+        assert!(split_command("").is_empty());
+        assert!(split_command("   ").is_empty());
+    }
+
+    #[test]
+    fn surrounding_whitespace_trimmed_on_single_token() {
+        assert_eq!(split_command("  notepad.exe  "), vec!["notepad.exe"]);
+    }
+
+    #[test]
+    fn multiple_flags_split() {
+        assert_eq!(
+            split_command("gvim -f --nofork"),
+            vec!["gvim", "-f", "--nofork"],
+        );
     }
 }
