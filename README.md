@@ -46,7 +46,7 @@ To have windmenu start automatically when you log in:
 windmenu daemon enable task
 ```
 
-For Scoop installs, use `task` or `user-folder` methods to avoid a brief terminal flash caused by the Scoop shim. See all available methods with `windmenu daemon enable --help`.
+See all available methods with `windmenu daemon enable --help`. In restricted environments where Task Scheduler is blocked by policy, `user-folder` (a plain shortcut in your Startup folder) requires no privileges at all.
 
 ### Customizing the Hotkey
 
@@ -222,7 +222,8 @@ Since 0.6.0 the menu renderer is built into `windmenu.exe`; the separate `wlines
 
 1. Remove any auto-start entries for the old wlines daemon (with the **old** binary: `windmenu daemon wlines disable <method>`, or delete them manually from `HKCU\...\Run` / Task Scheduler / the Startup folder).
 2. Stop and delete any leftover `wlines-daemon.exe`.
-3. The `wlines_daemon_path` / `wlines_cli_path` config keys and the generated `wlines-config.txt` file are no longer used; the `windmenu fetch` and `windmenu daemon wlines|all` commands were removed (use `windmenu daemon ...`).
+3. Delete old `start-windmenu-daemon-*.vbs` / `start-wlines-daemon-*.vbs` files from your Startup folders (`shell:startup`, `shell:common startup`); the `user-folder` method now uses a plain `windmenu.lnk` shortcut.
+4. The `wlines_daemon_path` / `wlines_cli_path` config keys and the generated `wlines-config.txt` file are no longer used; the `windmenu fetch` and `windmenu daemon wlines|all` commands were removed (use `windmenu daemon ...`).
 
 ## Troubleshooting
 
@@ -234,16 +235,7 @@ The `task` method uses `schtasks.exe`, which may fail if your account lacks perm
 windmenu daemon enable user-folder
 ```
 
-This places a VBS wrapper in your Startup folder and requires no special privileges.
-
-### Brief terminal flash on startup with Scoop
-
-If you installed via Scoop and enabled auto-startup with the `registry` method, you may see a console window flash briefly when Windows launches the Scoop shim. Switch to `task` or `user-folder` to avoid this:
-
-```powershell
-windmenu daemon disable
-windmenu daemon enable user-folder
-```
+This places a regular shortcut (`windmenu.lnk`) in your Startup folder and requires no special privileges.
 
 ### Configuration not being read
 

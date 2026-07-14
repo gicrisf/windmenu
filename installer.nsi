@@ -181,25 +181,9 @@ Section /o "Task Scheduler (Admin)" SecAutoStartTask
 SectionEnd
 
 Section /o "Current User Startup Folder" SecAutoStartUser
-  ; Create VBS script for silent startup
-  FileOpen $0 "$INSTDIR\start-windmenu-user.vbs" w
-  FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon start", 0, False$\r$\n'
-  FileClose $0
-
-  ; Copy to user startup folder
-  CopyFiles "$INSTDIR\start-windmenu-user.vbs" "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\"
-SectionEnd
-
-Section /o "All Users Startup Folder" SecAutoStartAll
-  ; Create VBS script for silent startup
-  FileOpen $0 "$INSTDIR\start-windmenu-all.vbs" w
-  FileWrite $0 'Set WshShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'WshShell.Run """$INSTDIR\windmenu.exe"" daemon start", 0, False$\r$\n'
-  FileClose $0
-
-  ; Copy to all users startup folder (requires admin privileges)
-  CopyFiles "$INSTDIR\start-windmenu-all.vbs" "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\"
+  ; Plain shortcut; windmenu.exe is a GUI-subsystem binary, so no console flashes
+  SetShellVarContext current
+  CreateShortCut "$SMSTARTUP\windmenu.lnk" "$INSTDIR\windmenu.exe" "" "$INSTDIR\windmenu.exe" 0 SW_SHOWNORMAL "" "windmenu launcher"
 SectionEnd
 SectionGroupEnd
 
@@ -209,8 +193,7 @@ SectionGroupEnd
   !insertmacro MUI_DESCRIPTION_TEXT ${SecStartMenu} "Create shortcuts in Start Menu"
     !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartRegistry} "Start Windmenu automatically using Windows Registry (basic method, starts when current user logs in)"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartTask} "Start Windmenu automatically using Task Scheduler (recommended - most reliable, but needs admin privileges)"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartUser} "Start Windmenu automatically using current user's startup folder"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartAll} "Start Windmenu automatically using all users startup folder (affects all users on this computer)"
+  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartUser} "Start Windmenu automatically using a shortcut in the current user's Startup folder (no admin required)"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 ; Uninstaller section
@@ -227,14 +210,12 @@ Section Uninstall
   nsExec::ExecToLog 'schtasks /delete /tn "windmenu" /f'
   Pop $0 ; ignore return value
   
-  ; Startup folder methods
-  Delete "$APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\start-windmenu-user.vbs"
-  Delete "$ALLUSERSPROFILE\Microsoft\Windows\Start Menu\Programs\Startup\start-windmenu-all.vbs"
-  
+  ; Startup folder method
+  SetShellVarContext current
+  Delete "$SMSTARTUP\windmenu.lnk"
+
   ; Remove files and uninstaller
   Delete "$INSTDIR\windmenu.exe"
-  Delete "$INSTDIR\start-windmenu-user.vbs"
-  Delete "$INSTDIR\start-windmenu-all.vbs"
   Delete "$INSTDIR\uninstall.exe"
   
   ; Remove shortcuts
@@ -272,9 +253,6 @@ Function .onSelChange
     IntOp $0 $0 + 1
   ${EndIf}
   ${If} ${SectionIsSelected} ${SecAutoStartUser}
-    IntOp $0 $0 + 1
-  ${EndIf}
-  ${If} ${SectionIsSelected} ${SecAutoStartAll}
     IntOp $0 $0 + 1
   ${EndIf}
   

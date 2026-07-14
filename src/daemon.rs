@@ -7,6 +7,8 @@ use clap::ValueEnum;
 use winapi::um::winbase::{DETACHED_PROCESS, CREATE_NEW_PROCESS_GROUP};
 use std::os::windows::process::CommandExt;
 
+use mslnk::ShellLink;
+
 use crate::reg::{check_registry_entry, add_registry_entry, remove_registry_entry, RegistryError};
 use crate::task::{check_scheduled_task, delete_task, SchTask, SchTaskExec, TaskSchedulerError};
 use crate::proc::{find_processes_with_name, find_first_process_with_name, terminate_process_by_pid, ProcessInfo};
@@ -19,8 +21,6 @@ pub enum StartupMethod {
     TaskScheduler,
     #[value(name = "user-folder")]
     UserFolder,
-    #[value(name = "all-users-folder")]
-    AllUsersFolder,
 }
 
 impl fmt::Display for StartupMethod {
@@ -55,8 +55,7 @@ pub trait Daemon {
     fn process_name(&self) -> &'static str;
     fn registry_name(&self) -> &'static str;
     fn task_name(&self) -> &'static str;
-    fn user_script_name(&self) -> &'static str;
-    fn all_users_script_name(&self) -> &'static str;
+    fn shortcut_name(&self) -> &'static str;
     fn path(&self) -> &Path;
 
     fn path_str(&self) -> String {
@@ -143,7 +142,6 @@ pub trait Daemon {
             StartupMethod::Registry => self.enable_registry_startup(),
             StartupMethod::TaskScheduler => self.enable_task_startup(),
             StartupMethod::UserFolder => self.enable_user_folder_startup(),
-            StartupMethod::AllUsersFolder => self.enable_all_users_folder_startup(),
         }
     }
 
@@ -152,7 +150,6 @@ pub trait Daemon {
             StartupMethod::Registry => self.disable_registry_startup(),
             StartupMethod::TaskScheduler => self.disable_task_startup(),
             StartupMethod::UserFolder => self.disable_user_folder_startup(),
-            StartupMethod::AllUsersFolder => self.disable_all_users_folder_startup(),
         }
     }
 
@@ -163,7 +160,6 @@ pub trait Daemon {
         let registry_status = self.get_registry_startup_status();
         let task_scheduler_status = self.get_task_scheduler_startup_status();
         let user_folder_status = self.get_user_folder_startup_status();
-        let all_users_folder_status = self.get_all_users_folder_startup_status();
 
         DaemonStatus {
             is_running,
@@ -171,7 +167,6 @@ pub trait Daemon {
             registry_status,
             task_scheduler_status,
             user_folder_status,
-            all_users_folder_status,
         }
     }
 
@@ -240,37 +235,36 @@ pub trait Daemon {
         Ok(())
     }
 
-    // User folder startup methods
-    fn enable_user_folder_startup(&self) -> Result<(), String> {
+    // User folder startup methods: a plain .lnk shortcut in the per-user
+    // Startup folder. No admin, no script host, nothing for AV to flag.
+    fn user_startup_shortcut_path(&self) -> Result<PathBuf, String> {
         let startup_folder = env::var("APPDATA")
             .map_err(|_| "Could not determine user startup folder".to_string())?;
 
-        let startup_dir = Path::new(&startup_folder).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
-        let script_path = startup_dir.join(self.user_script_name());
-        let working_dir = self.working_directory()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let vbs_content = format!(r#"Set WshShell = CreateObject("WScript.Shell")
-WshShell.CurrentDirectory = "{}"
-WshShell.Run """{}""", 0, False"#, working_dir, self.path_str());
+        Ok(Path::new(&startup_folder)
+            .join("Microsoft\\Windows\\Start Menu\\Programs\\Startup")
+            .join(self.shortcut_name()))
+    }
 
-        fs::write(&script_path, vbs_content)
-            .map_err(|_| format!("Failed to create {} VBS startup script", self.name()))?;
+    fn enable_user_folder_startup(&self) -> Result<(), String> {
+        let shortcut_path = self.user_startup_shortcut_path()?;
+
+        let mut link = ShellLink::new(self.path())
+            .map_err(|e| format!("Failed to create {} startup shortcut: {}", self.name(), e))?;
+        link.set_working_dir(self.working_directory().map(|p| p.to_string_lossy().to_string()));
+        link.create_lnk(&shortcut_path)
+            .map_err(|e| format!("Failed to write {} startup shortcut: {}", self.name(), e))?;
 
         println!("User folder startup enabled for {} daemon", self.name());
         Ok(())
     }
 
     fn disable_user_folder_startup(&self) -> Result<(), String> {
-        let startup_folder = env::var("APPDATA")
-            .map_err(|_| "Could not determine user startup folder".to_string())?;
+        let shortcut_path = self.user_startup_shortcut_path()?;
 
-        let startup_dir = Path::new(&startup_folder).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
-        let script_path = startup_dir.join(self.user_script_name());
-
-        if script_path.exists() {
-            fs::remove_file(&script_path)
-                .map_err(|_| format!("Failed to remove {} VBS startup script", self.name()))?;
+        if shortcut_path.exists() {
+            fs::remove_file(&shortcut_path)
+                .map_err(|_| format!("Failed to remove {} startup shortcut", self.name()))?;
         }
 
         println!("User folder startup disabled for {} daemon", self.name());
@@ -303,60 +297,9 @@ WshShell.Run """{}""", 0, False"#, working_dir, self.path_str());
     }
 
     fn get_user_folder_startup_status(&self) -> bool {
-        if let Ok(startup_folder) = env::var("APPDATA") {
-            let startup_dir = Path::new(&startup_folder).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
-            let script_path = startup_dir.join(self.user_script_name());
-            script_path.exists()
-        } else {
-            false
-        }
-    }
-
-    // All users folder startup methods
-    fn enable_all_users_folder_startup(&self) -> Result<(), String> {
-        let startup_folder = env::var("ALLUSERSPROFILE")
-            .map_err(|_| "Could not determine all users startup folder".to_string())?;
-
-        let startup_dir = Path::new(&startup_folder).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
-        let script_path = startup_dir.join(self.all_users_script_name());
-        let working_dir = self.working_directory()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let vbs_content = format!(r#"Set WshShell = CreateObject("WScript.Shell")
-WshShell.CurrentDirectory = "{}"
-WshShell.Run """{}""", 0, False"#, working_dir, self.path_str());
-
-        fs::write(&script_path, vbs_content)
-            .map_err(|_| format!("Failed to create {} VBS startup script (admin privileges may be required)", self.name()))?;
-
-        println!("All users folder startup enabled for {} daemon", self.name());
-        Ok(())
-    }
-
-    fn disable_all_users_folder_startup(&self) -> Result<(), String> {
-        let startup_folder = env::var("ALLUSERSPROFILE")
-            .map_err(|_| "Could not determine all users startup folder".to_string())?;
-
-        let startup_dir = Path::new(&startup_folder).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
-        let script_path = startup_dir.join(self.all_users_script_name());
-
-        if script_path.exists() {
-            fs::remove_file(&script_path)
-                .map_err(|_| format!("Failed to remove {} VBS startup script (admin privileges may be required)", self.name()))?;
-        }
-
-        println!("All users folder startup disabled for {} daemon", self.name());
-        Ok(())
-    }
-
-    fn get_all_users_folder_startup_status(&self) -> bool {
-        if let Ok(startup_folder) = env::var("ALLUSERSPROFILE") {
-            let startup_dir = Path::new(&startup_folder).join("Microsoft\\Windows\\Start Menu\\Programs\\Startup");
-            let script_path = startup_dir.join(self.all_users_script_name());
-            script_path.exists()
-        } else {
-            false
-        }
+        self.user_startup_shortcut_path()
+            .map(|p| p.exists())
+            .unwrap_or(false)
     }
 }
 
@@ -392,12 +335,8 @@ impl Daemon for WindmenuDaemon {
         "windmenu-daemon"
     }
 
-    fn user_script_name(&self) -> &'static str {
-        "start-windmenu-daemon-user.vbs"
-    }
-
-    fn all_users_script_name(&self) -> &'static str {
-        "start-windmenu-daemon-all.vbs"
+    fn shortcut_name(&self) -> &'static str {
+        "windmenu.lnk"
     }
 
     fn is_running(&self) -> bool {
@@ -486,7 +425,6 @@ pub struct DaemonStatus {
     pub registry_status: bool,
     pub task_scheduler_status: bool,
     pub user_folder_status: bool,
-    pub all_users_folder_status: bool,
 }
 
 impl fmt::Display for DaemonStatus {
@@ -508,9 +446,6 @@ impl fmt::Display for DaemonStatus {
         }
         if self.user_folder_status {
             writeln!(f, "    User Folder: Enabled")?;
-        }
-        if self.all_users_folder_status {
-            writeln!(f, "    All Users Folder: Enabled")?;
         }
 
         Ok(())

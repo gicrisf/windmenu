@@ -9,6 +9,9 @@ The menu renderer is now a native Rust module inside `windmenu.exe` — a full p
 - `filter_mode` values are `complete` or `keywords` (as in wlines; the previously documented `fuzzy`/`substring` values never existed and fell back to `complete`)
 - Upgraders: remove old wlines-daemon auto-start entries (see "Upgrading from 0.5.x" in the README)
 - Hotkey detection now uses `RegisterHotKey` (event-driven, no idle CPU, no missed or repeated triggers) instead of a 50ms `GetAsyncKeyState` poll loop. Hotkeys must be any number of modifiers (WIN/CTRL/ALT/SHIFT) plus exactly one other key; if registration fails (combo taken by another app), the daemon shows an error dialog and exits instead of silently misbehaving. The `hotkey_poll_interval` config key is removed and silently ignored
+- windmenu.exe is now a GUI-subsystem binary: no console window ever flashes, from any launch path (Startup shortcut, registry Run key, Scoop shim). CLI output still works in terminals via console attachment
+- The `user-folder` startup method now creates a plain `windmenu.lnk` shortcut instead of a VBS wrapper — VBScript is deprecated by Microsoft, and script-in-Startup-folder artifacts are prime AV/EDR quarantine targets. Existing `.vbs` entries from older versions should be removed manually
+- The `all-users-folder` startup method is removed (it required admin; per-user methods cover the actual use cases)
 
 ## Bug Fixes
 

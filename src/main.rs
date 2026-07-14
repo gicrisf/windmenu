@@ -1,3 +1,8 @@
+// GUI subsystem: no console window is allocated when launched from the shell,
+// a Startup shortcut, or the registry Run key. CLI output still works via
+// attach_parent_console() below.
+#![windows_subsystem = "windows"]
+
 use std::sync::Arc;
 use std::env;
 use std::path::PathBuf;
@@ -61,11 +66,11 @@ enum DaemonAction {
         #[arg(value_enum)]
         method: StartupMethod,
     },
-    /// Disable startup method
+    /// Disable startup method (all methods if none given)
     Disable {
-        /// Startup method to disable
+        /// Startup method to disable; omit to disable all
         #[arg(value_enum)]
-        method: StartupMethod,
+        method: Option<StartupMethod>,
     },
 }
 
@@ -102,7 +107,25 @@ fn find_on_path(exe_name: &str) -> Option<PathBuf> {
         })
 }
 
+/// Attach to the parent process console so println!/eprintln! reach the
+/// terminal despite the GUI subsystem. Skipped when stdout is already valid
+/// (redirected to a file/pipe); a no-op when there is no parent console
+/// (launched from Explorer or a Startup shortcut).
+fn attach_parent_console() {
+    use winapi::um::processenv::GetStdHandle;
+    use winapi::um::winbase::STD_OUTPUT_HANDLE;
+    use winapi::um::wincon::{AttachConsole, ATTACH_PARENT_PROCESS};
+
+    unsafe {
+        if GetStdHandle(STD_OUTPUT_HANDLE).is_null() {
+            AttachConsole(ATTACH_PARENT_PROCESS);
+        }
+    }
+}
+
 fn main() {
+    attach_parent_console();
+
     let current_exe = env::current_exe()
         .expect("Failed to get current executable path");
     let cli = Cli::parse();
@@ -206,14 +229,25 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
             }
         }
         DaemonAction::Disable { method } => {
-            match daemon.disable_startup(&method) {
-                Ok(()) => {
-                    println!("windmenu daemon startup method '{}' disabled successfully", method);
+            let methods: Vec<StartupMethod> = match method {
+                Some(m) => vec![m],
+                None => vec![StartupMethod::Registry, StartupMethod::TaskScheduler, StartupMethod::UserFolder],
+            };
+
+            let mut failed = false;
+            for m in methods {
+                match daemon.disable_startup(&m) {
+                    Ok(()) => {
+                        println!("windmenu daemon startup method '{}' disabled successfully", m);
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to disable windmenu daemon startup method '{}': {}", m, err);
+                        failed = true;
+                    }
                 }
-                Err(err) => {
-                    eprintln!("Failed to disable windmenu daemon startup method '{}': {}", method, err);
-                    std::process::exit(1);
-                }
+            }
+            if failed {
+                std::process::exit(1);
             }
         }
     }
