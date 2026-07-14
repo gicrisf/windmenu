@@ -30,7 +30,6 @@ use winapi::um::synchapi::CreateEventW;
 
 use crate::apps::{find_reparse_points, get_windows_apps_path};
 use crate::theme::WlinesTheme;
-use crate::wlan;
 use crate::wlines;
 
 #[derive(Debug)]
@@ -68,7 +67,6 @@ pub enum MenuCommand {
     Configured(Vec<String>),  // For configured commands
     KeyCombo(Vec<String>),    // For key combinations like ALT+X
     ToggleCapsLock,           // For caps lock toggle
-    WlanScan,                 // For WLAN network scan
     RefreshApps,              // Rescan Start Menu and Windows Store apps
     ReloadConfig,             // Reload commands from windmenu.toml
 }
@@ -83,7 +81,6 @@ impl EntryStore {
     fn empty() -> Self {
         let mut builtins = HashMap::new();
         builtins.insert("Toggle Caps Lock".to_string(), MenuCommand::ToggleCapsLock);
-        builtins.insert("WLAN Scan".to_string(), MenuCommand::WlanScan);
         builtins.insert("Refresh Apps".to_string(), MenuCommand::RefreshApps);
         builtins.insert("Reload Config".to_string(), MenuCommand::ReloadConfig);
         Self { builtins, config: HashMap::new(), dynamic: HashMap::new() }
@@ -491,10 +488,6 @@ impl Menu {
                 println!("Toggling caps lock: {}", selected);
                 Self::toggle_caps_lock()
             },
-            Some(MenuCommand::WlanScan) => {
-                println!("Performing WLAN scan: {}", selected);
-                Self::perform_wlan_scan()
-            },
             Some(MenuCommand::RefreshApps) => {
                 let entries = self.entries.clone();
                 thread::spawn(move || {
@@ -689,16 +682,5 @@ impl Menu {
             },
             _ => Err(MenuError::KeyParsing(key.to_string())),
         }
-    }
-
-    fn perform_wlan_scan() -> Result<(), MenuError> {
-        println!("Starting WLAN scan...");
-
-        // Run the scan in a separate thread to avoid blocking
-        thread::spawn(|| {
-            wlan::test_wlan_scan();
-        });
-
-        Ok(())
     }
 }

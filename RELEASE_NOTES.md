@@ -36,3 +36,22 @@ iex "& {$(irm https://raw.githubusercontent.com/gicrisf/windmenu/main/install.ps
 - No admin required
 
 NSIS script is still there, but I stopped suggesting it. I doubt the user of this program could prefer a NSIS installer to command line solutions.
+
+## Cooperative shutdown and AV safety
+
+- Process enumeration (`CreateToolhelp32Snapshot`) and forcible termination (`TerminateProcess`) replaced with cooperative shutdown via named kernel primitives: a named mutex for singleton detection and a named event for graceful stop. No process table walks, no `OpenProcess(PROCESS_TERMINATE)`. The entire `proc.rs` module is removed
+- Dropped `tlhelp32` and `processthreadsapi` winapi features; added `synchapi`
+
+## Task Scheduler startup method removed
+
+- The `task` (Task Scheduler) startup method is removed. It depended on `schtasks.exe` and inline XML generation — both flagged by AV behavioral heuristics — and required admin privileges while offering no reliability advantage over the simpler methods
+- Only `registry` (Run key) and `user-folder` (plain `.lnk` shortcut) remain. The `task.rs` module is deleted
+
+## Lazy menu loading
+
+- The menu hotkey registers immediately at startup, before the Start Menu scan begins. Built-in commands and custom commands from `windmenu.toml` are available on the first keypress; Start Menu shortcuts and Windows Store apps populate in the background over the following seconds
+- New built-in commands: **Refresh Apps** rescans the Start Menu and Windows Store apps; **Reload Config** reloads custom commands from `windmenu.toml`. Neither requires restarting the daemon
+
+## WLAN scanning removed
+
+- The `WLAN Scan` built-in command and `windmenu test wlan-scan` / `wlan-interfaces` test subcommands are removed. The WLAN API surface (`wlanapi`) was unusual for an application launcher and the WiFi scanning plumbing never materialized into a user-facing feature. The `wlan.rs` module is deleted.

@@ -43,10 +43,10 @@ Press `Win+Space` to launch.
 To have windmenu start automatically when you log in:
 
 ```powershell
-windmenu daemon enable task
+windmenu daemon enable user-folder
 ```
 
-See all available methods with `windmenu daemon enable --help`. In restricted environments where Task Scheduler is blocked by policy, `user-folder` (a plain shortcut in your Startup folder) requires no privileges at all.
+This places a `windmenu.lnk` shortcut in your Startup folder. No admin required. Alternatively, use `registry` to add windmenu to the Run key (`HKCU\...\Run`). See all available methods with `windmenu daemon enable --help`.
 
 ### Customizing the Hotkey
 
@@ -72,7 +72,7 @@ The menu is populated from three sources:
 
 ### 1. Start Menu Shortcuts (discovered automatically)
 
-Windmenu scans for `.lnk` files in the Windows Start Menu directories (`%APPDATA%` and `%ProgramData%`). This is how it finds your installed applications. The scanning happens once at startup, so the menu appears instantly when you press the hotkey.
+Windmenu scans for `.lnk` files in the Windows Start Menu directories (`%APPDATA%` and `%ProgramData%`). This is how it finds your installed applications. The scan runs in the background at startup, so the hotkey is available immediately while apps populate over the next few seconds. If you install a new application, use the `Refresh Apps` command from the menu to pick it up without restarting the daemon.
 
 ### 2. Custom Commands (configured in `windmenu.toml`)
 
@@ -98,7 +98,12 @@ Implementation uses Windows `SendInput` API with proper key sequencing (press al
 
 ### 3. Special Commands (always active)
 
-These are built-in commands that are always available, primarily useful for edge cases. For example, the Caps Lock toggle command is handy if you've remapped your physical Caps Lock key to something else but occasionally need to actually toggle caps lock state.
+These are built-in commands that are always available:
+
+- **Toggle Caps Lock** — useful if you've remapped your physical Caps Lock key but occasionally need to toggle it
+- **WLAN Scan** — trigger a WiFi network scan
+- **Refresh Apps** — rescan the Start Menu and Windows Store apps without restarting the daemon
+- **Reload Config** — reload custom commands from `windmenu.toml` without restarting
 
 ## Key Combination Commands
 
@@ -226,16 +231,6 @@ Since 0.6.0 the menu renderer is built into `windmenu.exe`; the separate `wlines
 4. The `wlines_daemon_path` / `wlines_cli_path` config keys and the generated `wlines-config.txt` file are no longer used; the `windmenu fetch` and `windmenu daemon wlines|all` commands were removed (use `windmenu daemon ...`).
 
 ## Troubleshooting
-
-### Auto-startup with Task Scheduler requires elevated privileges
-
-The `task` method uses `schtasks.exe`, which may fail if your account lacks permission to create scheduled tasks. If you get an access denied error, try `user-folder` instead:
-
-```powershell
-windmenu daemon enable user-folder
-```
-
-This places a regular shortcut (`windmenu.lnk`) in your Startup folder and requires no special privileges.
 
 ### Configuration not being read
 

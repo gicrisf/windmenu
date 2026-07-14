@@ -14,12 +14,10 @@ mod reg;
 mod daemon;
 mod menu;
 mod theme;
-mod wlan;
 mod wlines;
 
 use daemon::{Daemon, DaemonError, StartupMethod, WindmenuDaemon};
 use apps::print_reparse_points_info;
-use wlan::{print_wlan_interfaces_info, test_wlan_scan};
 use menu::Menu;
 
 #[derive(Parser)]
@@ -78,12 +76,6 @@ enum TestType {
     /// Test and display reparse points
     #[command(name = "reparse-points")]
     ReparsePoints,
-    /// Test and display WLAN interfaces
-    #[command(name = "wlan-interfaces")]
-    WlanInterfaces,
-    /// Trigger WLAN scan on all interfaces
-    #[command(name = "wlan-scan")]
-    WlanScan,
     /// Show config resolution paths
     #[command(name = "config")]
     Config,
@@ -256,12 +248,6 @@ fn handle_test_command(test_type: TestType) {
     match test_type {
         TestType::ReparsePoints => {
             print_reparse_points_info();
-        }
-        TestType::WlanInterfaces => {
-            print_wlan_interfaces_info();
-        }
-        TestType::WlanScan => {
-            test_wlan_scan();
         }
         TestType::Config => {
             menu::print_config_debug();
