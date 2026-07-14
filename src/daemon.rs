@@ -14,14 +14,11 @@ use winapi::um::handleapi::CloseHandle;
 use winapi::um::winnt::{SYNCHRONIZE, EVENT_MODIFY_STATE};
 
 use crate::reg::{check_registry_entry, add_registry_entry, remove_registry_entry, RegistryError};
-use crate::task::{check_scheduled_task, delete_task, SchTask, SchTaskExec, TaskSchedulerError};
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum StartupMethod {
     #[value(name = "registry")]
     Registry,
-    #[value(name = "task")]
-    TaskScheduler,
     #[value(name = "user-folder")]
     UserFolder,
 }
@@ -54,7 +51,6 @@ impl fmt::Display for DaemonError {
 pub trait Daemon {
     fn name(&self) -> &'static str;
     fn registry_name(&self) -> &'static str;
-    fn task_name(&self) -> &'static str;
     fn shortcut_name(&self) -> &'static str;
     fn path(&self) -> &Path;
 
@@ -120,7 +116,6 @@ pub trait Daemon {
     fn enable_startup(&self, method: &StartupMethod) -> Result<(), String> {
         match method {
             StartupMethod::Registry => self.enable_registry_startup(),
-            StartupMethod::TaskScheduler => self.enable_task_startup(),
             StartupMethod::UserFolder => self.enable_user_folder_startup(),
         }
     }
@@ -128,7 +123,6 @@ pub trait Daemon {
     fn disable_startup(&self, method: &StartupMethod) -> Result<(), String> {
         match method {
             StartupMethod::Registry => self.disable_registry_startup(),
-            StartupMethod::TaskScheduler => self.disable_task_startup(),
             StartupMethod::UserFolder => self.disable_user_folder_startup(),
         }
     }
@@ -137,13 +131,11 @@ pub trait Daemon {
         let is_running = self.is_running();
 
         let registry_status = self.get_registry_startup_status();
-        let task_scheduler_status = self.get_task_scheduler_startup_status();
         let user_folder_status = self.get_user_folder_startup_status();
 
         DaemonStatus {
             is_running,
             registry_status,
-            task_scheduler_status,
             user_folder_status,
         }
     }
@@ -171,45 +163,6 @@ pub trait Daemon {
             })?;
 
         println!("Registry startup disabled for {} daemon", self.name());
-        Ok(())
-    }
-
-    // Task scheduler startup methods
-    // TODO impl special for each case
-    fn enable_task_startup(&self) -> Result<(), String> {
-        let task = SchTask {
-            date: "2025-07-11T00:00:00.0000000".to_string(),
-            author: env!("CARGO_PKG_AUTHORS").to_string(),
-            description: format!("{} daemon", self.name()),
-            logon_trigger: true,
-            logon_delay: if self.name() == "wlines" { "PT3S".to_string() } else { "PT5S".to_string() },
-            privilege: "LeastPrivilege".to_string(),
-            multiple_instance_policy: "IgnoreNew".to_string(),
-            disallow_start_if_on_batteries: false,
-            allow_hard_terminate: true,
-            run_only_if_network_available: false,
-            stop_on_idle: false,
-            restart_on_idle: false,
-            allow_start_on_demand: true,
-            enabled: true,
-            hidden: false,
-            run_only_if_idle: false,
-            wake_to_run: false,
-            priority: 7,
-            actions: vec![SchTaskExec {
-                command: self.path_str(),
-                working_directory: self.working_directory().map(|p| p.to_string_lossy().to_string()),
-            }],
-        };
-
-        task.write_to_disk(self.task_name())?;
-        println!("Task scheduler startup enabled for {} daemon", self.name());
-        Ok(())
-    }
-
-    fn disable_task_startup(&self) -> Result<(), String> {
-        delete_task(self.task_name());
-        println!("Task scheduler startup disabled for {} daemon", self.name());
         Ok(())
     }
 
@@ -260,20 +213,6 @@ pub trait Daemon {
         }
     }
 
-    fn get_task_scheduler_startup_status(&self) -> bool {
-        match check_scheduled_task(self.task_name()) {
-            Ok(exists) => exists,
-            Err(TaskSchedulerError::UnknownError(msg)) => {
-                eprintln!("Warning: Failed to check task scheduler startup for {}: {}", self.name(), msg);
-                false
-            }
-            Err(e) => {
-                eprintln!("Warning: Failed to check task scheduler startup for {}: {:?}", self.name(), e);
-                false
-            }
-        }
-    }
-
     fn get_user_folder_startup_status(&self) -> bool {
         self.user_startup_shortcut_path()
             .map(|p| p.exists())
@@ -303,10 +242,6 @@ impl Daemon for WindmenuDaemon {
 
     fn registry_name(&self) -> &'static str {
         "WindmenuDaemon"
-    }
-
-    fn task_name(&self) -> &'static str {
-        "windmenu-daemon"
     }
 
     fn shortcut_name(&self) -> &'static str {
@@ -396,7 +331,6 @@ impl Daemon for WindmenuDaemon {
 pub struct DaemonStatus {
     pub is_running: bool,
     pub registry_status: bool,
-    pub task_scheduler_status: bool,
     pub user_folder_status: bool,
 }
 
@@ -407,9 +341,6 @@ impl fmt::Display for DaemonStatus {
         writeln!(f, "  Startup configuration:")?;
         if self.registry_status {
             writeln!(f, "    Registry: Enabled")?;
-        }
-        if self.task_scheduler_status {
-            writeln!(f, "    Task Scheduler: Enabled")?;
         }
         if self.user_folder_status {
             writeln!(f, "    User Folder: Enabled")?;

@@ -102,84 +102,6 @@ Section /o "Registry Run (Basic)" SecAutoStartRegistry
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" '"$INSTDIR\windmenu.exe" daemon start'
 SectionEnd
 
-Section /o "Task Scheduler (Admin)" SecAutoStartTask
-  ; Check current privileges
-  UserInfo::GetAccountType
-  Pop $0
-  ${If} $0 != "Admin"
-    MessageBox MB_YESNO|MB_ICONEXCLAMATION \
-      "Task Scheduler requires administrator privileges. $\n$\nWould you like to restart the installer as administrator?" \
-      IDYES run_as_admin IDNO skip_task
-    run_as_admin:
-      ExecShell "runas" "$EXEPATH" ""
-      Quit
-    skip_task:
-      SectionSetFlags ${SecAutoStartTask} 0  ; Deselect section
-      Return
-  ${EndIf}
-  ; Create task XML content with correct paths
-  FileOpen $0 "$INSTDIR\windmenu-task.xml" w
-  FileWrite $0 '<?xml version="1.0" encoding="UTF-16"?>$\r$\n'
-  FileWrite $0 '<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">$\r$\n'
-  FileWrite $0 '  <RegistrationInfo>$\r$\n'
-  FileWrite $0 '    <Date>2025-07-11T00:00:00.0000000</Date>$\r$\n'
-  FileWrite $0 '    <Author>windmenu</Author>$\r$\n'
-  FileWrite $0 '    <Description>Automatically start windmenu application on user login</Description>$\r$\n'
-  FileWrite $0 '  </RegistrationInfo>$\r$\n'
-  FileWrite $0 '  <Triggers>$\r$\n'
-  FileWrite $0 '    <LogonTrigger>$\r$\n'
-  FileWrite $0 '      <Enabled>true</Enabled>$\r$\n'
-  FileWrite $0 '      <Delay>PT10S</Delay>$\r$\n'
-  FileWrite $0 '    </LogonTrigger>$\r$\n'
-  FileWrite $0 '  </Triggers>$\r$\n'
-  FileWrite $0 '  <Principals>$\r$\n'
-  FileWrite $0 '    <Principal id="Author">$\r$\n'
-  FileWrite $0 '      <LogonType>InteractiveToken</LogonType>$\r$\n'
-  FileWrite $0 '      <RunLevel>LeastPrivilege</RunLevel>$\r$\n'
-  FileWrite $0 '    </Principal>$\r$\n'
-  FileWrite $0 '  </Principals>$\r$\n'
-  FileWrite $0 '  <Settings>$\r$\n'
-  FileWrite $0 '    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>$\r$\n'
-  FileWrite $0 '    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>$\r$\n'
-  FileWrite $0 '    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>$\r$\n'
-  FileWrite $0 '    <AllowHardTerminate>true</AllowHardTerminate>$\r$\n'
-  FileWrite $0 '    <StartWhenAvailable>true</StartWhenAvailable>$\r$\n'
-  FileWrite $0 '    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>$\r$\n'
-  FileWrite $0 '    <IdleSettings>$\r$\n'
-  FileWrite $0 '      <StopOnIdleEnd>false</StopOnIdleEnd>$\r$\n'
-  FileWrite $0 '      <RestartOnIdle>false</RestartOnIdle>$\r$\n'
-  FileWrite $0 '    </IdleSettings>$\r$\n'
-  FileWrite $0 '    <AllowStartOnDemand>true</AllowStartOnDemand>$\r$\n'
-  FileWrite $0 '    <Enabled>true</Enabled>$\r$\n'
-  FileWrite $0 '    <Hidden>false</Hidden>$\r$\n'
-  FileWrite $0 '    <RunOnlyIfIdle>false</RunOnlyIfIdle>$\r$\n'
-  FileWrite $0 '    <WakeToRun>false</WakeToRun>$\r$\n'
-  FileWrite $0 '    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>$\r$\n'
-  FileWrite $0 '    <Priority>7</Priority>$\r$\n'
-  FileWrite $0 '  </Settings>$\r$\n'
-  FileWrite $0 '  <Actions Context="Author">$\r$\n'
-  FileWrite $0 '    <Exec>$\r$\n'
-  FileWrite $0 '      <Command>$INSTDIR\windmenu.exe</Command>$\r$\n'
-  FileWrite $0 '      <Arguments>daemon start</Arguments>$\r$\n'
-  FileWrite $0 '      <WorkingDirectory>$INSTDIR</WorkingDirectory>$\r$\n'
-  FileWrite $0 '    </Exec>$\r$\n'
-  FileWrite $0 '  </Actions>$\r$\n'
-  FileWrite $0 '</Task>$\r$\n'
-  FileClose $0
-  
-  ; Create the scheduled task
-  nsExec::ExecToLog 'schtasks /create /tn "windmenu" /xml "$INSTDIR\windmenu-task.xml" /f'
-  Pop $0
-  ${If} $0 != 0
-    DetailPrint "Warning: Failed to create scheduled task. You may need to run as administrator."
-  ${Else}
-    DetailPrint "Scheduled task created successfully"
-  ${EndIf}
-  
-  ; Clean up temporary XML file
-  Delete "$INSTDIR\windmenu-task.xml"
-SectionEnd
-
 Section /o "Current User Startup Folder" SecAutoStartUser
   ; Plain shortcut; windmenu.exe is a GUI-subsystem binary, so no console flashes
   SetShellVarContext current
@@ -192,7 +114,6 @@ SectionGroupEnd
   !insertmacro MUI_DESCRIPTION_TEXT ${SecCore} "Core Windmenu files (windmenu.exe) and configuration files"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecStartMenu} "Create shortcuts in Start Menu"
     !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartRegistry} "Start Windmenu automatically using Windows Registry (basic method, starts when current user logs in)"
-  !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartTask} "Start Windmenu automatically using Task Scheduler (recommended - most reliable, but needs admin privileges)"
   !insertmacro MUI_DESCRIPTION_TEXT ${SecAutoStartUser} "Start Windmenu automatically using a shortcut in the current user's Startup folder (no admin required)"
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
@@ -205,10 +126,6 @@ Section Uninstall
   ; Remove all possible startup methods
   ; Registry Run method
   DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon"
-  
-  ; Task Scheduler method
-  nsExec::ExecToLog 'schtasks /delete /tn "windmenu" /f'
-  Pop $0 ; ignore return value
   
   ; Startup folder method
   SetShellVarContext current
@@ -247,9 +164,6 @@ Function .onSelChange
   StrCpy $0 0
   
   ${If} ${SectionIsSelected} ${SecAutoStartRegistry}
-    IntOp $0 $0 + 1
-  ${EndIf}
-  ${If} ${SectionIsSelected} ${SecAutoStartTask}
     IntOp $0 $0 + 1
   ${EndIf}
   ${If} ${SectionIsSelected} ${SecAutoStartUser}

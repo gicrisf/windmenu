@@ -10,7 +10,6 @@ use clap::{Parser, Subcommand};
 
 mod apps;
 mod reg;
-mod task;
 mod daemon;
 mod menu;
 mod theme;
@@ -230,7 +229,7 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
         DaemonAction::Disable { method } => {
             let methods: Vec<StartupMethod> = match method {
                 Some(m) => vec![m],
-                None => vec![StartupMethod::Registry, StartupMethod::TaskScheduler, StartupMethod::UserFolder],
+                None => vec![StartupMethod::Registry, StartupMethod::UserFolder],
             };
 
             let mut failed = false;
