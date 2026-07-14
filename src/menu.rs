@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::process::{Command, Stdio};
 use std::thread;
+use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::process::CommandExt;
 use std::fmt;
@@ -13,7 +14,9 @@ use toml;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::shellapi::ShellExecuteW;
 use winapi::um::winuser::{
-    GetAsyncKeyState, SendInput, INPUT, INPUT_KEYBOARD, SW_RESTORE,
+    DispatchMessageW, GetMessageW, MessageBoxW, RegisterHotKey, SendInput, TranslateMessage,
+    INPUT, INPUT_KEYBOARD, MB_ICONERROR, MB_OK, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT,
+    MOD_WIN, MSG, SW_RESTORE, WM_HOTKEY,
     KEYBDINPUT, KEYEVENTF_KEYUP, VK_MENU, VK_SHIFT, VK_CAPITAL, VK_CONTROL,
     VK_TAB, VK_ESCAPE, VK_LWIN, VK_SPACE, VK_RETURN, VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN,
     VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12,
@@ -68,32 +71,96 @@ pub enum MenuCommand {
 #[derive(Debug, Clone, Deserialize)]
 pub struct Hotkey {
     keys: Vec<String>,
-    poll_interval: u64, // Polling interval in milliseconds
 }
 
 impl Hotkey {
-    fn is_pressed(&self) -> bool {
-        unsafe {
-            self.keys.iter().all(|key| {
-                if let Ok(vk_code) = Menu::parse_key_name_to_vk_code(key) {
-                    GetAsyncKeyState(vk_code as i32) & 0x8000u16 as i16 != 0
-                } else {
-                    false // If we can't parse the key, consider it not pressed
+    const HOTKEY_ID: i32 = 1;
+
+    /// Map the configured keys to a RegisterHotKey (modifiers, vk) pair.
+    /// Valid combos are any number of modifiers (WIN/CTRL/ALT/SHIFT) plus
+    /// exactly one other key.
+    fn to_registration(&self) -> Result<(u32, u32), MenuError> {
+        let mut modifiers = MOD_NOREPEAT;
+        let mut vk: Option<u32> = None;
+
+        for key in &self.keys {
+            match key.to_uppercase().as_str() {
+                "WIN" | "WINDOWS" => modifiers |= MOD_WIN,
+                "CTRL" | "CONTROL" => modifiers |= MOD_CONTROL,
+                "ALT" => modifiers |= MOD_ALT,
+                "SHIFT" => modifiers |= MOD_SHIFT,
+                _ => {
+                    let code = Menu::parse_key_name_to_vk_code(key)?;
+                    if vk.is_some() {
+                        return Err(MenuError::InvalidArguments(format!(
+                            "hotkey {:?} has more than one non-modifier key; \
+                             use any number of WIN/CTRL/ALT/SHIFT plus exactly one other key",
+                            self.keys
+                        )));
+                    }
+                    vk = Some(code as u32);
                 }
-            })
+            }
+        }
+
+        match vk {
+            Some(vk) => Ok((modifiers as u32, vk)),
+            None => Err(MenuError::InvalidArguments(format!(
+                "hotkey {:?} has no non-modifier key; \
+                 use any number of WIN/CTRL/ALT/SHIFT plus exactly one other key",
+                self.keys
+            ))),
         }
     }
 
-    pub fn poll<F>(&self, mut callback: F) -> !
+    /// Wait for hotkey activations via RegisterHotKey, invoking `callback`
+    /// on each WM_HOTKEY. Event-driven: the thread sleeps in GetMessageW,
+    /// so idle CPU cost is zero and presses can't be missed or repeated
+    /// (MOD_NOREPEAT). Fatal errors are shown in a message box because the
+    /// detached daemon has no visible stderr.
+    pub fn listen<F>(&self, mut callback: F) -> !
     where
         F: FnMut(),
     {
-        loop {
-            if self.is_pressed() {
-                callback();
+        let (modifiers, vk) = self.to_registration().unwrap_or_else(|e| {
+            Self::fatal(&format!("Invalid hotkey configuration: {}", e));
+        });
+
+        unsafe {
+            if RegisterHotKey(std::ptr::null_mut(), Self::HOTKEY_ID, modifiers, vk) == 0 {
+                Self::fatal(&format!(
+                    "Failed to register hotkey {} (error {}). \
+                     Another application may already use this combo; \
+                     change 'hotkey' in windmenu.toml.",
+                    self.keys.join("+"),
+                    GetLastError()
+                ));
             }
-            thread::sleep(std::time::Duration::from_millis(self.poll_interval));
+
+            println!("Hotkey registered ({})", self.keys.join("+"));
+            let mut msg: MSG = std::mem::zeroed();
+            while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
+                if msg.message == WM_HOTKEY && msg.wParam == Self::HOTKEY_ID as usize {
+                    callback();
+                }
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
         }
+
+        Self::fatal("Hotkey message loop ended unexpectedly");
+    }
+
+    /// Report a fatal daemon error and exit. Uses a message box since the
+    /// detached daemon process has stdout/stderr redirected to null.
+    fn fatal(message: &str) -> ! {
+        eprintln!("{}", message);
+        unsafe {
+            let text: Vec<u16> = OsStr::new(message).encode_wide().chain(std::iter::once(0)).collect();
+            let caption: Vec<u16> = OsStr::new("windmenu").encode_wide().chain(std::iter::once(0)).collect();
+            MessageBoxW(std::ptr::null_mut(), text.as_ptr(), caption.as_ptr(), MB_OK | MB_ICONERROR);
+        }
+        std::process::exit(1);
     }
 }
 
@@ -222,7 +289,6 @@ impl Menu {
 
         let mut hotkey = Hotkey {
             keys: vec!["WIN".to_string(), "SPACE".to_string()],
-            poll_interval: 50, // 50ms
         };
         let mut commands = HashMap::new();
         let mut settings = WlinesTheme::default().to_settings();
@@ -267,9 +333,10 @@ impl Menu {
             if let Some(ref keys) = &cfg.hotkey {
                 hotkey.keys = keys.clone();
             }
-            // Update poll interval from config
-            if let Some(interval) = &cfg.hotkey_poll_interval {
-                hotkey.poll_interval = *interval;
+            // hotkey_poll_interval is obsolete: hotkeys are registered with
+            // Windows (RegisterHotKey) instead of polled
+            if cfg.hotkey_poll_interval.is_some() {
+                eprintln!("Warning: 'hotkey_poll_interval' in windmenu.toml is no longer used; the hotkey is registered with Windows instead of polled");
             }
             // Key commands
             if let Some(config_commands) = cfg.commands {

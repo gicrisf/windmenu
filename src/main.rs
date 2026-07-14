@@ -265,7 +265,7 @@ fn handle_test_command(test_type: TestType) {
 fn start_daemon_self_detached() {
     let menu = Arc::new(Menu::new());
 
-    menu.hotkey.poll(|| {
+    menu.hotkey.listen(|| {
         if let Err(e) = menu.clone().show() {
             eprintln!("Menu show error: {}", e);
         }

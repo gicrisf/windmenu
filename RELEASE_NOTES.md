@@ -8,6 +8,7 @@ The menu renderer is now a native Rust module inside `windmenu.exe` — a full p
 - Each hotkey press opens a fresh menu window in-process — no stale daemon state, no orphaned renderer processes
 - `filter_mode` values are `complete` or `keywords` (as in wlines; the previously documented `fuzzy`/`substring` values never existed and fell back to `complete`)
 - Upgraders: remove old wlines-daemon auto-start entries (see "Upgrading from 0.5.x" in the README)
+- Hotkey detection now uses `RegisterHotKey` (event-driven, no idle CPU, no missed or repeated triggers) instead of a 50ms `GetAsyncKeyState` poll loop. Hotkeys must be any number of modifiers (WIN/CTRL/ALT/SHIFT) plus exactly one other key; if registration fails (combo taken by another app), the daemon shows an error dialog and exits instead of silently misbehaving. `hotkey_poll_interval` is obsolete (a warning is printed if present)
 
 ## Bug Fixes
 
