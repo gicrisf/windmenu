@@ -14,16 +14,19 @@ use toml;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::shellapi::ShellExecuteW;
 use winapi::um::winuser::{
-    DispatchMessageW, GetMessageW, MessageBoxW, RegisterHotKey, SendInput, TranslateMessage,
-    INPUT, INPUT_KEYBOARD, MB_ICONERROR, MB_OK, MOD_ALT, MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT,
-    MOD_WIN, MSG, SW_RESTORE, WM_HOTKEY,
-    KEYBDINPUT, KEYEVENTF_KEYUP, VK_MENU, VK_SHIFT, VK_CAPITAL, VK_CONTROL,
-    VK_TAB, VK_ESCAPE, VK_LWIN, VK_SPACE, VK_RETURN, VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN,
-    VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12,
-    VK_OEM_COMMA, VK_OEM_PERIOD, VK_OEM_1, VK_OEM_2, VK_OEM_3, VK_OEM_4, VK_OEM_5, VK_OEM_6, VK_OEM_7,
+    DispatchMessageW, MessageBoxW, MsgWaitForMultipleObjects, PeekMessageW, RegisterHotKey,
+    SendInput, TranslateMessage, INPUT, INPUT_KEYBOARD, MB_ICONERROR, MB_OK, MOD_ALT,
+    MOD_CONTROL, MOD_NOREPEAT, MOD_SHIFT, MOD_WIN, MSG, PM_REMOVE, QS_ALLINPUT,
+    SW_RESTORE, WM_HOTKEY, WM_QUIT, KEYBDINPUT, KEYEVENTF_KEYUP,
+    VK_MENU, VK_SHIFT, VK_CAPITAL, VK_CONTROL, VK_TAB, VK_ESCAPE, VK_LWIN, VK_SPACE,
+    VK_RETURN, VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5,
+    VK_F6, VK_F7, VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_OEM_COMMA, VK_OEM_PERIOD,
+    VK_OEM_1, VK_OEM_2, VK_OEM_3, VK_OEM_4, VK_OEM_5, VK_OEM_6, VK_OEM_7,
     VK_OEM_MINUS, VK_OEM_PLUS
 };
-use winapi::um::winbase::CREATE_NEW_PROCESS_GROUP;
+use winapi::um::winbase::{CREATE_NEW_PROCESS_GROUP, INFINITE, WAIT_OBJECT_0};
+use winapi::um::handleapi::CloseHandle;
+use winapi::um::synchapi::CreateEventW;
 
 use crate::apps::{find_reparse_points, get_windows_apps_path};
 use crate::theme::WlinesTheme;
@@ -118,7 +121,7 @@ impl Hotkey {
     /// so idle CPU cost is zero and presses can't be missed or repeated
     /// (MOD_NOREPEAT). Fatal errors are shown in a message box because the
     /// detached daemon has no visible stderr.
-    pub fn listen<F>(&self, mut callback: F) -> !
+    pub fn listen<F>(&self, mut callback: F)
     where
         F: FnMut(),
     {
@@ -137,18 +140,50 @@ impl Hotkey {
                 ));
             }
 
+            let event_name: Vec<u16> = "windmenu-shutdown-event\0".encode_utf16().collect();
+            let shutdown_event = CreateEventW(
+                std::ptr::null_mut(),
+                1, // manual-reset
+                0, // initially non-signaled
+                event_name.as_ptr(),
+            );
+            if shutdown_event.is_null() {
+                Self::fatal("Failed to create shutdown event");
+            }
+
             println!("Hotkey registered ({})", self.keys.join("+"));
             let mut msg: MSG = std::mem::zeroed();
-            while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
-                if msg.message == WM_HOTKEY && msg.wParam == Self::HOTKEY_ID as usize {
-                    callback();
-                }
-                TranslateMessage(&msg);
-                DispatchMessageW(&msg);
-            }
-        }
+            loop {
+                let result = MsgWaitForMultipleObjects(
+                    1,
+                    &shutdown_event,
+                    0,
+                    INFINITE,
+                    QS_ALLINPUT,
+                );
 
-        Self::fatal("Hotkey message loop ended unexpectedly");
+                if result == WAIT_OBJECT_0 {
+                    break;
+                }
+
+                if result == WAIT_OBJECT_0 + 1 {
+                    while PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, PM_REMOVE) != 0 {
+                        if msg.message == WM_QUIT {
+                            break;
+                        }
+                        if msg.message == WM_HOTKEY && msg.wParam == Self::HOTKEY_ID as usize {
+                            callback();
+                        }
+                        TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            CloseHandle(shutdown_event);
+        }
     }
 
     /// Report a fatal daemon error and exit. Uses a message box since the

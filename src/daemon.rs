@@ -9,9 +9,12 @@ use std::os::windows::process::CommandExt;
 
 use mslnk::ShellLink;
 
+use winapi::um::synchapi::{OpenMutexW, OpenEventW, SetEvent};
+use winapi::um::handleapi::CloseHandle;
+use winapi::um::winnt::{SYNCHRONIZE, EVENT_MODIFY_STATE};
+
 use crate::reg::{check_registry_entry, add_registry_entry, remove_registry_entry, RegistryError};
 use crate::task::{check_scheduled_task, delete_task, SchTask, SchTaskExec, TaskSchedulerError};
-use crate::proc::{find_processes_with_name, find_first_process_with_name, terminate_process_by_pid, ProcessInfo};
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum StartupMethod {
@@ -33,7 +36,6 @@ impl fmt::Display for StartupMethod {
 pub enum DaemonError {
     AlreadyRunning,
     NotRunning,
-    ProcessError(String),
     StartupFailed(String),
     ShutdownFailed(String),
 }
@@ -43,7 +45,6 @@ impl fmt::Display for DaemonError {
         match self {
             DaemonError::AlreadyRunning => write!(f, "Daemon is already running"),
             DaemonError::NotRunning => write!(f, "Daemon is not running"),
-            DaemonError::ProcessError(msg) => write!(f, "Process error: {}", msg),
             DaemonError::StartupFailed(msg) => write!(f, "Startup failed: {}", msg),
             DaemonError::ShutdownFailed(msg) => write!(f, "Shutdown failed: {}", msg),
         }
@@ -52,7 +53,6 @@ impl fmt::Display for DaemonError {
 
 pub trait Daemon {
     fn name(&self) -> &'static str;
-    fn process_name(&self) -> &'static str;
     fn registry_name(&self) -> &'static str;
     fn task_name(&self) -> &'static str;
     fn shortcut_name(&self) -> &'static str;
@@ -68,10 +68,7 @@ pub trait Daemon {
             .map(|p| p.to_path_buf())
     }
 
-    fn is_running(&self) -> bool {
-        // Just check if any instance exists
-        find_first_process_with_name(self.process_name()).is_some()
-    }
+    fn is_running(&self) -> bool;
 
     fn start(&self) -> Result<(), DaemonError> {
         if self.is_running() {
@@ -104,29 +101,12 @@ pub trait Daemon {
         Ok(())
     }
 
-    fn stop(&self) -> Result<(), DaemonError> {
-        // Find all instances and terminate them
-        let processes = find_processes_with_name(self.process_name());
-
-        if processes.is_empty() {
-            return Err(DaemonError::ProcessError("No daemon processes found".to_string()));
-        }
-
-        for process in processes {
-            terminate_process_by_pid(process.pid)
-                .map_err(|err| DaemonError::ShutdownFailed(format!("Failed to terminate {} daemon PID {}: {}", self.name(), process.pid, err)))?;
-            println!("Terminated {} process: {}", self.name(), process);
-        }
-
-        Ok(())
-    }
+    fn stop(&self) -> Result<(), DaemonError>;
 
     fn restart(&self) -> Result<(), DaemonError> {
-        // Stop the daemon if it's running (ignore NotRunning error)
         match self.stop() {
             Ok(()) => {},
             Err(DaemonError::NotRunning) => {},
-            Err(DaemonError::ProcessError(_)) => {},
             Err(e) => return Err(e),
         }
 
@@ -155,7 +135,6 @@ pub trait Daemon {
 
     fn get_status(&self) -> DaemonStatus {
         let is_running = self.is_running();
-        let processes = find_processes_with_name(self.process_name());
 
         let registry_status = self.get_registry_startup_status();
         let task_scheduler_status = self.get_task_scheduler_startup_status();
@@ -163,7 +142,6 @@ pub trait Daemon {
 
         DaemonStatus {
             is_running,
-            processes,
             registry_status,
             task_scheduler_status,
             user_folder_status,
@@ -323,10 +301,6 @@ impl Daemon for WindmenuDaemon {
         "windmenu"
     }
 
-    fn process_name(&self) -> &'static str {
-        "windmenu.exe"
-    }
-
     fn registry_name(&self) -> &'static str {
         "WindmenuDaemon"
     }
@@ -340,19 +314,16 @@ impl Daemon for WindmenuDaemon {
     }
 
     fn is_running(&self) -> bool {
-        // For windmenu, check if any instance other than current is running
-        let current_pid = std::process::id();
-        let processes = find_processes_with_name(self.process_name());
-
-        // Get parent PID to exclude shims
-        let parent_pid = processes.iter()
-            .find(|p| p.pid == current_pid)
-            .map(|p| p.parent_pid);
-
-        // Exclude current process and parent process
-        processes.iter().any(|proc| {
-            proc.pid != current_pid && Some(proc.pid) != parent_pid
-        })
+        let name: Vec<u16> = "windmenu-daemon-mutex\0".encode_utf16().collect();
+        unsafe {
+            let h = OpenMutexW(SYNCHRONIZE, 0, name.as_ptr());
+            if h.is_null() {
+                false
+            } else {
+                CloseHandle(h);
+                true
+            }
+        }
     }
 
     fn start(&self) -> Result<(), DaemonError> {
@@ -396,24 +367,27 @@ impl Daemon for WindmenuDaemon {
             return Err(DaemonError::NotRunning);
         }
 
-        // For windmenu, find all instances except current process and terminate them
-        let processes = find_processes_with_name(self.process_name());
-        let current_pid = std::process::id();
-
-        let daemon_processes: Vec<_> = processes.iter()
-                                                .filter(|process| process.pid != current_pid)
-                                                .collect();
-
-        if daemon_processes.is_empty() {
-            return Err(DaemonError::ProcessError("No daemon processes found".to_string()));
+        let name: Vec<u16> = "windmenu-shutdown-event\0".encode_utf16().collect();
+        unsafe {
+            let event = OpenEventW(EVENT_MODIFY_STATE, 0, name.as_ptr());
+            if event.is_null() {
+                return Err(DaemonError::ShutdownFailed(
+                    "Daemon is running but its shutdown event was not found. Try again.".to_string()
+                ));
+            }
+            SetEvent(event);
+            CloseHandle(event);
         }
 
-        for process in daemon_processes {
-            terminate_process_by_pid(process.pid)
-                .map_err(|err| DaemonError::ShutdownFailed(format!("Failed to terminate {} daemon PID {}: {}", self.name(), process.pid, err)))?;
-            println!("Terminated {} process: {}", self.name(), process);
+        thread::sleep(time::Duration::from_millis(500));
+
+        if self.is_running() {
+            return Err(DaemonError::ShutdownFailed(
+                "Daemon did not shut down within timeout".to_string()
+            ));
         }
 
+        println!("{} daemon stopped successfully", self.name());
         Ok(())
     }
 }
@@ -421,7 +395,6 @@ impl Daemon for WindmenuDaemon {
 #[derive(Debug, Clone)]
 pub struct DaemonStatus {
     pub is_running: bool,
-    pub processes: Vec<ProcessInfo>,
     pub registry_status: bool,
     pub task_scheduler_status: bool,
     pub user_folder_status: bool,
@@ -430,12 +403,6 @@ pub struct DaemonStatus {
 impl fmt::Display for DaemonStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "  Running: {}", if self.is_running { "Yes" } else { "No" })?;
-
-        if self.is_running && !self.processes.is_empty() {
-            for process in &self.processes {
-                writeln!(f, "    {}", process)?;
-            }
-        }
 
         writeln!(f, "  Startup configuration:")?;
         if self.registry_status {

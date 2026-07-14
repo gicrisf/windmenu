@@ -12,7 +12,6 @@ mod apps;
 mod reg;
 mod task;
 mod daemon;
-mod proc;
 mod menu;
 mod theme;
 mod wlan;
@@ -271,6 +270,22 @@ fn handle_test_command(test_type: TestType) {
 }
 
 fn start_daemon_self_detached() {
+    use winapi::um::synchapi::CreateMutexW;
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::errhandlingapi::GetLastError;
+    use winapi::shared::winerror::ERROR_ALREADY_EXISTS;
+
+    unsafe {
+        let name: Vec<u16> = "windmenu-daemon-mutex\0".encode_utf16().collect();
+        let mutex = CreateMutexW(std::ptr::null_mut(), 1, name.as_ptr());
+        if GetLastError() == ERROR_ALREADY_EXISTS {
+            if !mutex.is_null() {
+                CloseHandle(mutex);
+            }
+            std::process::exit(0);
+        }
+    }
+
     let menu = Arc::new(Menu::new());
 
     menu.hotkey.listen(|| {

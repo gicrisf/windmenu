@@ -13,4 +13,4 @@ clap = { version = "4.5.48", features = ["derive"] }
 mslnk = "0.1"
 serde = { version = "1.0.219", features = ["derive"] }
 toml = "0.8.23"
-winapi = { version = "0.3.9", features = ["winuser", "shellapi", "wincon", "processenv", "fileapi", "handleapi", "errhandlingapi", "tlhelp32", "winbase", "wingdi", "libloaderapi", "processthreadsapi", "winnt", "winerror", "wlanapi"] }
+winapi = { version = "0.3.9", features = ["winuser", "shellapi", "wincon", "processenv", "fileapi", "handleapi", "errhandlingapi", "winbase", "wingdi", "libloaderapi", "winnt", "winerror", "wlanapi", "synchapi"] }
