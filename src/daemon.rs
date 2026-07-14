@@ -314,16 +314,18 @@ impl Daemon for WindmenuDaemon {
             CloseHandle(event);
         }
 
-        thread::sleep(time::Duration::from_millis(500));
-
-        if self.is_running() {
-            return Err(DaemonError::ShutdownFailed(
-                "Daemon did not shut down within timeout".to_string()
-            ));
+        // Poll for exit instead of a single fixed sleep: the daemon may be
+        // mid-callback when the event fires
+        for _ in 0..20 {
+            thread::sleep(time::Duration::from_millis(100));
+            if !self.is_running() {
+                return Ok(());
+            }
         }
 
-        println!("{} daemon stopped successfully", self.name());
-        Ok(())
+        Err(DaemonError::ShutdownFailed(
+            "Daemon did not shut down within timeout".to_string()
+        ))
     }
 }
 
