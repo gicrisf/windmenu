@@ -35,7 +35,8 @@ fi
 
 # Create the installer
 echo -e "\033[0;33mCreating installer...\033[0m"
-makensis installer.nsi
+VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+makensis -DPRODUCT_VERSION="$VERSION" installer.nsi
 
 if [ $? -eq 0 ]; then
     echo -e "\033[0;32mInstaller created successfully: windmenu-installer.exe\033[0m"

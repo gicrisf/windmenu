@@ -31,7 +31,8 @@ if (-not (Test-Path "target\release\windmenu.exe")) {
 
 # Create the installer
 Write-Host "Creating installer..." -ForegroundColor Yellow
-& makensis installer.nsi
+$version = (Select-String -Path Cargo.toml -Pattern '^version').Line -replace '.*"(.+)".*','$1'
+& makensis "-DPRODUCT_VERSION=$version" installer.nsi
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Installer created successfully: windmenu-installer.exe" -ForegroundColor Green

@@ -2,7 +2,9 @@
 ; This installer bundles windmenu.exe (menu renderer built in since 0.6.0)
 
 !define PRODUCT_NAME "Windmenu"
-!define PRODUCT_VERSION "0.6.0"
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION "0.0.0"
+!endif
 !define PRODUCT_PUBLISHER "Giovanni Crisalfi"
 !define PRODUCT_WEB_SITE "https://github.com/gicrisf/windmenu"
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\windmenu.exe"
@@ -145,7 +147,6 @@ Section Uninstall
   SetAutoClose true
 SectionEnd
 
-; Function to check if application is running
 Function .onInit
   MessageBox MB_YESNO|MB_ICONQUESTION \
     "Installer will close any running Windmenu processes to continue. Continue?" \
@@ -155,7 +156,11 @@ Function .onInit
     Abort
     
   close_processes:
-    nsExec::ExecToLog 'taskkill /F /IM windmenu.exe' 
+    IfFileExists "$INSTDIR\windmenu.exe" 0 force_kill
+    nsExec::ExecToLog '"$INSTDIR\windmenu.exe" daemon stop'
+    Pop $0
+  force_kill:
+    nsExec::ExecToLog 'taskkill /F /IM windmenu.exe'
 FunctionEnd
 
 ; Function to handle component selection changes

@@ -38,6 +38,20 @@ Download `windmenu-portable.zip` from the [latest release](https://github.com/gi
 
 Press `Ctrl+Alt+Space` to launch.
 
+### Option 4: Cargo Install
+
+```bash
+cargo install --git https://github.com/gicrisf/windmenu
+```
+
+> **Note**: Cargo compiles windmenu from source on your Windows host, so a Rust
+> toolchain is required. The precompiled binary from a [release](https://github.com/gicrisf/windmenu/releases/latest)
+> is usually the simpler option. `cargo uninstall windmenu` removes the binary
+> but does not stop a running daemon nor clean up auto-start entries — run
+> `windmenu daemon stop` followed by `windmenu daemon disable` before uninstalling.
+
+Press `Ctrl+Alt+Space` to launch.
+
 ### Auto-Startup
 
 To have windmenu start automatically when you log in:
