@@ -2,6 +2,11 @@
 name = "windmenu"
 version = "0.6.0"
 edition = "2021"
+description = "A minimalist Windows launcher"
+license = "GPL-3.0-only"
+repository = "https://github.com/gicrisf/windmenu"
+keywords = ["windows", "launcher", "dmenu", "hotkey"]
+categories = ["command-line-utilities", "gui"]
 
 [[bin]]
 name = "windmenu"
