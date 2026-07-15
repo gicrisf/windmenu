@@ -18,6 +18,19 @@
 # modifiers (WIN/CTRL/ALT/SHIFT) plus exactly one other key.
 
 # ===============================================================================
+# SEARCH
+# ===============================================================================
+# How the typed query matches menu entries (search behavior, not appearance).
+
+[search]
+# matching: how the query is compared against each entry
+#   "complete" - whole query matched as a substring
+#   "keywords" - each whitespace-separated word must match
+#   "fuzzy"    - fzf-style subsequence scoring, results sorted by score (default)
+matching = "fuzzy"
+case_sensitive = false              # Match case exactly (default: false)
+
+# ===============================================================================
 # THEME
 # ===============================================================================
 # Configure the appearance of the WindMenu interface using descriptive field names.
@@ -36,7 +49,6 @@ text_foreground_color = "#cdd6f4"   # Input field text color (Catppuccin Mocha t
 font_name = "Consolas"              # Font family name (monospace recommended)
 font_size = 20                      # Font size in points
 prompt = "Run :"                    # Custom prompt text shown in input field
-filter_mode = "fuzzy"            # Search mode: "complete" (whole query as substring), "keywords" (each word must match), or "fuzzy" (fzf-style subsequence scoring)
 
 # ===============================================================================
 # CUSTOM COMMANDS

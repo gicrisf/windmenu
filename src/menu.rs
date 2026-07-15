@@ -293,6 +293,15 @@ struct MenuConfig {
     theme: Option<WlinesTheme>,
     commands: Option<Vec<CommandConfig>>,
     hotkey: Option<Vec<String>>, // Custom hotkey keys (e.g., ["WIN", "SPACE"])
+    search: Option<SearchConfig>,
+}
+
+/// Search behavior — how the typed query matches menu entries. Kept separate
+/// from `[theme]` (appearance); named after rofi's `-matching`/`-case-sensitive`.
+#[derive(Debug, Deserialize)]
+struct SearchConfig {
+    matching: Option<String>,    // "complete" / "keywords" / "fuzzy"
+    case_sensitive: Option<bool>, // Match case exactly (default: false)
 }
 
 /// The commented default config, embedded at compile time. This is the same
@@ -568,6 +577,14 @@ impl Menu {
         if let Some((cfg, _config_dir)) = MenuConfig::load().ok() {
             if let Some(ref theme) = &cfg.theme {
                 settings = theme.to_settings();
+            }
+            if let Some(ref search) = &cfg.search {
+                if let Some(ref matching) = search.matching {
+                    settings.filter_mode = wlines::FilterMode::parse(matching);
+                }
+                if let Some(case_sensitive) = search.case_sensitive {
+                    settings.case_sensitive = case_sensitive;
+                }
             }
             if let Some(ref keys) = &cfg.hotkey {
                 hotkey.keys = keys.clone();

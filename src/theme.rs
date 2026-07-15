@@ -1,12 +1,11 @@
 use serde::Deserialize;
 
-use crate::wlines::{self, FilterMode, Settings};
+use crate::wlines::{self, Settings};
 
 #[derive(Debug, Deserialize)]
 pub struct WlinesTheme {
     pub lines: Option<usize>,                    // Lines to show
     pub prompt: Option<String>,                  // Prompt text
-    pub filter_mode: Option<String>,             // Filter mode (complete/keywords/fuzzy)
     pub selected_index: Option<usize>,           // Initial selected index
     pub padding_x: Option<usize>,                // Window padding
     pub width_x: Option<usize>,                  // Window width (centers the window)
@@ -39,9 +38,6 @@ impl WlinesTheme {
             settings.line_count = lines;
         }
         settings.prompt = self.prompt.clone();
-        if let Some(ref filter_mode) = self.filter_mode {
-            settings.filter_mode = FilterMode::parse(filter_mode);
-        }
         if let Some(selected_index) = self.selected_index {
             settings.initial_index = selected_index;
         }
@@ -72,7 +68,6 @@ impl WlinesTheme {
         WlinesTheme {
             lines: Some(12),
             prompt: None,
-            filter_mode: None,
             selected_index: None,
             padding_x: Some(8),
             width_x: Some(1000),
