@@ -38,17 +38,16 @@ case_sensitive = false              # Match case exactly (default: false)
 
 [theme]
 lines = 12                          # Number of menu items to display
-padding_x = 8                       # Horizontal padding in pixels
-width_x = 1000                      # Window width in pixels
-background_color = "#1e1e2e"        # Main background color (Catppuccin Mocha base)
-foreground_color = "#cdd6f4"        # Main text color (Catppuccin Mocha text)
+padding = 8                         # Horizontal padding in pixels
+width = 1000                        # Window width in pixels
+background_color = "#1e1e2e"        # Window background (Catppuccin Mocha base)
+text_color = "#cdd6f4"              # Window text (Catppuccin Mocha text)
 selected_background_color = "#89b4fa"  # Highlighted item background (Catppuccin Mocha blue)
-selected_foreground_color = "#1e1e2e"  # Highlighted item text (dark on light)
-text_background_color = "#313244"   # Input field background color (Catppuccin Mocha surface0)
-text_foreground_color = "#cdd6f4"   # Input field text color (Catppuccin Mocha text)
-font_name = "Consolas"              # Font family name (monospace recommended)
-font_size = 20                      # Font size in points
-prompt = "Run :"                    # Custom prompt text shown in input field
+selected_text_color = "#1e1e2e"     # Highlighted item text (dark on light)
+entry_background_color = "#313244"  # Input box background (Catppuccin Mocha surface0)
+entry_text_color = "#cdd6f4"        # Input box text (Catppuccin Mocha text)
+font = "Consolas 20"                # Font as "Family Size" (monospace recommended)
+prompt = "Run :"                    # Custom prompt text shown in input box
 
 # ===============================================================================
 # CUSTOM COMMANDS

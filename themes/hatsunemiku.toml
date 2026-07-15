@@ -4,18 +4,16 @@
 
 [theme]
 lines = 12                          # Number of menu items to display
-padding_x = 8                       # Horizontal padding in pixels
-width_x = 1000                      # Window width in pixels
-background_color = "#242829"        # Main background color (dark gray)
-foreground_color = "#dcd7d7"        # Main text color (light gray)
+padding = 8                         # Horizontal padding in pixels
+width = 1000                        # Window width in pixels
+background_color = "#242829"        # Window background (dark gray)
+text_color = "#dcd7d7"              # Window text (light gray)
 selected_background_color = "#7cc7d6"  # Highlighted item background (iconic Miku cyan)
-selected_foreground_color = "#242829"  # Highlighted item text (dark on light)
-text_background_color = "#333738"   # Input field background color (slightly lighter than base)
-text_foreground_color = "#dcd7d7"   # Input field text color (light gray)
-font_name = "Consolas"              # Font family name (monospace recommended)
-font_size = 16                      # Font size in points
-prompt = "Run:"                     # Custom prompt text shown in input field
-filter_mode = "fuzzy"            # Search mode: "complete" (whole query as substring), "keywords" (each word must match), or "fuzzy" (fzf-style subsequence scoring)
+selected_text_color = "#242829"     # Highlighted item text (dark on light)
+entry_background_color = "#333738"  # Input box background (slightly lighter than base)
+entry_text_color = "#dcd7d7"        # Input box text (light gray)
+font = "Consolas 16"                # Font as "Family Size"
+prompt = "Run:"                     # Custom prompt text shown in input box
 
 # ===============================================================================
 # Hatsune Miku Palette Reference
