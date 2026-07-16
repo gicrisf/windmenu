@@ -2,23 +2,30 @@ use serde::Deserialize;
 
 use crate::wlines::{self, Settings};
 
-/// Appearance of the menu. Field names follow rofi's theme vocabulary:
-/// `text_color` (not "foreground"), `entry_*` for the input box, a single
-/// `font` string ("Family Size"), and `width`/`padding`/`selected_row`.
-#[derive(Debug, Deserialize)]
-pub struct WlinesTheme {
-    pub lines: Option<usize>,                      // Lines to show
-    pub prompt: Option<String>,                    // Prompt text
-    pub selected_row: Option<usize>,               // Initial selected row
-    pub padding: Option<usize>,                    // Window padding
-    pub width: Option<usize>,                      // Window width (centers the window)
-    pub background_color: Option<String>,          // Window background
-    pub text_color: Option<String>,                // Window text
-    pub selected_background_color: Option<String>, // Selected item background
-    pub selected_text_color: Option<String>,       // Selected item text
-    pub entry_background_color: Option<String>,    // Input box background
-    pub entry_text_color: Option<String>,          // Input box text
-    pub font: Option<String>,                      // Font as "Family Size", e.g. "Consolas 18"
+/// A menu color scheme: the six colors a `[themes.<name>]` preset defines, and
+/// the same keys usable as top-level overrides. Config keys are short
+/// (`bg`/`fg`/…); `bg_input`/`fg_input` map to the renderer's input-box fields
+/// (`bg_edit`/`fg_edit`).
+#[derive(Debug, Default, Deserialize)]
+pub struct Palette {
+    pub bg: Option<String>,        // Window background
+    pub fg: Option<String>,        // Window text
+    pub bg_select: Option<String>, // Selected item background
+    pub fg_select: Option<String>, // Selected item text
+    pub bg_input: Option<String>,  // Input box background
+    pub fg_input: Option<String>,  // Input box text
+}
+
+impl Palette {
+    /// Overlay the set colors onto `settings`, leaving unset fields alone.
+    pub fn apply(&self, settings: &mut Settings) {
+        apply_color(&mut settings.bg, &self.bg, "bg");
+        apply_color(&mut settings.fg, &self.fg, "fg");
+        apply_color(&mut settings.bg_select, &self.bg_select, "bg_select");
+        apply_color(&mut settings.fg_select, &self.fg_select, "fg_select");
+        apply_color(&mut settings.bg_edit, &self.bg_input, "bg_input");
+        apply_color(&mut settings.fg_edit, &self.fg_input, "fg_input");
+    }
 }
 
 fn apply_color(target: &mut u32, color: &Option<String>, name: &str) {
@@ -32,7 +39,7 @@ fn apply_color(target: &mut u32, color: &Option<String>, name: &str) {
 
 /// Parse a rofi-style font spec ("Family Size") into name and size. A trailing
 /// integer is taken as the point size; otherwise the whole string is the family.
-fn parse_font(spec: &str) -> (Option<String>, Option<i32>) {
+pub fn parse_font(spec: &str) -> (Option<String>, Option<i32>) {
     let spec = spec.trim();
     if let Some((name, last)) = spec.rsplit_once(char::is_whitespace) {
         if let Ok(size) = last.parse::<i32>() {
@@ -44,61 +51,46 @@ fn parse_font(spec: &str) -> (Option<String>, Option<i32>) {
     ((!spec.is_empty()).then(|| spec.to_string()), None)
 }
 
-impl WlinesTheme {
-    /// Convert the theme into renderer settings, keeping renderer defaults
-    /// for any unset field.
-    pub fn to_settings(&self) -> Settings {
-        let mut settings = Settings::default();
-
-        if let Some(lines) = self.lines {
-            settings.line_count = lines;
-        }
-        settings.prompt = self.prompt.clone();
-        if let Some(selected_row) = self.selected_row {
-            settings.initial_index = selected_row;
-        }
-        if let Some(padding) = self.padding {
-            settings.padding = padding as i32;
-        }
-        if let Some(width) = self.width {
-            settings.width = width as i32;
-            settings.center_window = true;
-        }
-        apply_color(&mut settings.bg, &self.background_color, "background_color");
-        apply_color(&mut settings.fg, &self.text_color, "text_color");
-        apply_color(&mut settings.bg_select, &self.selected_background_color, "selected_background_color");
-        apply_color(&mut settings.fg_select, &self.selected_text_color, "selected_text_color");
-        apply_color(&mut settings.bg_edit, &self.entry_background_color, "entry_background_color");
-        apply_color(&mut settings.fg_edit, &self.entry_text_color, "entry_text_color");
-        if let Some(ref font) = self.font {
-            let (name, size) = parse_font(font);
-            if let Some(name) = name {
-                settings.font_name = name;
-            }
-            if let Some(size) = size {
-                settings.font_size = size;
-            }
-        }
-
-        settings
+/// Apply a font spec ("Family Size") onto `settings`, updating only the parts
+/// present in the spec.
+pub fn apply_font(settings: &mut Settings, spec: &str) {
+    let (name, size) = parse_font(spec);
+    if let Some(name) = name {
+        settings.font_name = name;
     }
-
-    pub fn default() -> Self {
-        WlinesTheme {
-            lines: Some(12),
-            prompt: None,
-            selected_row: None,
-            padding: Some(8),
-            width: Some(1000),
-            background_color: Some("#1e1e1e".to_string()),
-            text_color: Some("#ffffff".to_string()),
-            selected_background_color: Some("#0078d4".to_string()),
-            selected_text_color: Some("#ffffff".to_string()),
-            entry_background_color: Some("#2d2d2d".to_string()),
-            entry_text_color: Some("#ffffff".to_string()),
-            font: Some("Consolas 18".to_string()),
-        }
+    if let Some(size) = size {
+        settings.font_size = size;
     }
+}
+
+/// windmenu's built-in color scheme (the "default" theme, a Windows-blue look).
+/// Kept in sync with `[themes.default]` in the shipped windmenu.toml so that a
+/// fresh `config init` reproduces the no-config appearance exactly.
+pub fn default_palette() -> Palette {
+    Palette {
+        bg: Some("#1e1e1e".to_string()),
+        fg: Some("#ffffff".to_string()),
+        bg_select: Some("#0078d4".to_string()),
+        fg_select: Some("#ffffff".to_string()),
+        bg_input: Some("#2d2d2d".to_string()),
+        fg_input: Some("#ffffff".to_string()),
+    }
+}
+
+/// The renderer settings windmenu starts from before any config is applied:
+/// wlines' bare defaults overlaid with windmenu's default window geometry and
+/// the built-in color scheme.
+pub fn default_settings() -> Settings {
+    let mut settings = Settings {
+        line_count: 12,
+        padding: 8,
+        width: 1000,
+        center_window: true,
+        ..Settings::default()
+    };
+    apply_font(&mut settings, "Consolas 20");
+    default_palette().apply(&mut settings);
+    settings
 }
 
 #[cfg(test)]

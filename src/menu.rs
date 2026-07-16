@@ -30,7 +30,7 @@ use winapi::um::handleapi::CloseHandle;
 use winapi::um::synchapi::CreateEventW;
 
 use crate::apps::{find_reparse_points, get_windows_apps_path};
-use crate::theme::WlinesTheme;
+use crate::theme::{self, Palette};
 use crate::wlines;
 
 #[derive(Debug)]
@@ -288,20 +288,81 @@ pub fn error_box(message: &str) {
     }
 }
 
+/// The whole config, flat. Search behavior, window geometry, and color
+/// overrides all sit at the top level; named themes live under `[themes.<name>]`
+/// and are selected by `theme = "<name>"`. Unknown/legacy keys are ignored
+/// (no `deny_unknown_fields`), so old sectioned configs degrade to defaults.
 #[derive(Debug, Deserialize)]
 struct MenuConfig {
-    theme: Option<WlinesTheme>,
-    commands: Option<Vec<CommandConfig>>,
     hotkey: Option<Vec<String>>, // Custom hotkey keys (e.g., ["WIN", "SPACE"])
-    search: Option<SearchConfig>,
+
+    // Search behavior (rofi's -matching / -case-sensitive).
+    matching: Option<String>,     // "complete" / "keywords" / "fuzzy"
+    case_sensitive: Option<bool>, // Match case exactly (default: false)
+
+    // Window geometry and font.
+    lines: Option<usize>,   // Lines to show
+    width: Option<usize>,   // Window width (centers the window)
+    padding: Option<usize>, // Window padding
+    font: Option<String>,   // Font as "Family Size", e.g. "Consolas 18"
+    prompt: Option<String>, // Text shown in the input box
+
+    // Color scheme: pick a named preset, then override individual keys.
+    theme: Option<String>,               // Selects [themes.<name>]
+    #[serde(flatten)]
+    colors: Palette,                     // Top-level color overrides
+    themes: Option<HashMap<String, Palette>>,
+
+    commands: Option<Vec<CommandConfig>>,
 }
 
-/// Search behavior — how the typed query matches menu entries. Kept separate
-/// from `[theme]` (appearance); named after rofi's `-matching`/`-case-sensitive`.
-#[derive(Debug, Deserialize)]
-struct SearchConfig {
-    matching: Option<String>,    // "complete" / "keywords" / "fuzzy"
-    case_sensitive: Option<bool>, // Match case exactly (default: false)
+/// Resolve a loaded config into renderer settings, starting from the built-in
+/// defaults. Returns any non-fatal warnings (e.g. an unknown theme name) so
+/// callers can surface them. A missing theme is not fatal: the launcher keeps
+/// the default palette and runs.
+fn resolve_settings(cfg: &MenuConfig) -> (wlines::Settings, Vec<String>) {
+    let mut settings = theme::default_settings();
+    let mut warnings = Vec::new();
+
+    // 1. Named theme preset (if any), then 2. per-key overrides win over it.
+    if let Some(ref name) = cfg.theme {
+        match cfg.themes.as_ref().and_then(|t| t.get(name)) {
+            Some(palette) => palette.apply(&mut settings),
+            None => warnings.push(format!(
+                "theme '{}' not found in [themes.*] — using defaults",
+                name
+            )),
+        }
+    }
+    cfg.colors.apply(&mut settings);
+
+    // 3. Window geometry and font.
+    if let Some(lines) = cfg.lines {
+        settings.line_count = lines;
+    }
+    if let Some(width) = cfg.width {
+        settings.width = width as i32;
+        settings.center_window = true;
+    }
+    if let Some(padding) = cfg.padding {
+        settings.padding = padding as i32;
+    }
+    if let Some(ref font) = cfg.font {
+        theme::apply_font(&mut settings, font);
+    }
+    if let Some(ref prompt) = cfg.prompt {
+        settings.prompt = Some(prompt.clone());
+    }
+
+    // 4. Search behavior.
+    if let Some(ref matching) = cfg.matching {
+        settings.filter_mode = wlines::FilterMode::parse(matching);
+    }
+    if let Some(case_sensitive) = cfg.case_sensitive {
+        settings.case_sensitive = case_sensitive;
+    }
+
+    (settings, warnings)
 }
 
 /// The commented default config, embedded at compile time. This is the same
@@ -375,7 +436,13 @@ pub fn config_path() {
 
     match MenuConfig::resolve_path() {
         Some(path) => match MenuConfig::load_from_file(&path) {
-            Ok(_) => println!("Result: using {}", path.display()),
+            Ok(cfg) => {
+                println!("Result: using {}", path.display());
+                let (_, warnings) = resolve_settings(&cfg);
+                for warning in warnings {
+                    println!("Warning: {}", warning);
+                }
+            }
             Err(e) => println!("Result: {} ({})", e, path.display()),
         },
         None => println!("Result: no config file found — using built-in defaults"),
@@ -571,20 +638,14 @@ impl Menu {
         let mut hotkey = Hotkey {
             keys: vec!["CTRL".to_string(), "ALT".to_string(), "SPACE".to_string()],
         };
-        let mut settings = WlinesTheme::default().to_settings();
+        let mut settings = theme::default_settings();
         let entries = Arc::new(RwLock::new(EntryStore::empty()));
 
-        if let Some((cfg, _config_dir)) = MenuConfig::load().ok() {
-            if let Some(ref theme) = &cfg.theme {
-                settings = theme.to_settings();
-            }
-            if let Some(ref search) = &cfg.search {
-                if let Some(ref matching) = search.matching {
-                    settings.filter_mode = wlines::FilterMode::parse(matching);
-                }
-                if let Some(case_sensitive) = search.case_sensitive {
-                    settings.case_sensitive = case_sensitive;
-                }
+        if let Ok((cfg, _config_dir)) = MenuConfig::load() {
+            let (resolved, warnings) = resolve_settings(&cfg);
+            settings = resolved;
+            for warning in warnings {
+                eprintln!("Warning: {}", warning);
             }
             if let Some(ref keys) = &cfg.hotkey {
                 hotkey.keys = keys.clone();
@@ -907,5 +968,99 @@ mod tests {
             split_command("gvim -f --nofork"),
             vec!["gvim", "-f", "--nofork"],
         );
+    }
+
+    use super::{resolve_settings, MenuConfig, DEFAULT_CONFIG};
+    use crate::theme::default_settings;
+    use crate::wlines::parse_color;
+
+    fn parse_config(s: &str) -> MenuConfig {
+        toml::from_str(s).expect("config should parse")
+    }
+
+    #[test]
+    fn theme_preset_is_applied() {
+        let cfg = parse_config(
+            r##"
+            theme = "nord"
+            [themes.nord]
+            bg_select = "#5e81ac"
+        "##,
+        );
+        let (settings, warnings) = resolve_settings(&cfg);
+        assert!(warnings.is_empty());
+        assert_eq!(settings.bg_select, parse_color("#5e81ac").unwrap());
+    }
+
+    #[test]
+    fn override_beats_preset() {
+        let cfg = parse_config(
+            r##"
+            theme = "nord"
+            bg_select = "#ffffff"
+            [themes.nord]
+            bg_select = "#5e81ac"
+        "##,
+        );
+        let (settings, _) = resolve_settings(&cfg);
+        assert_eq!(settings.bg_select, parse_color("#ffffff").unwrap());
+    }
+
+    #[test]
+    fn missing_theme_warns_and_keeps_default() {
+        let cfg = parse_config(r#"theme = "nope""#);
+        let (settings, warnings) = resolve_settings(&cfg);
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("nope"));
+        // The default palette is left intact; the launcher still resolves.
+        let def = default_settings();
+        assert_eq!(settings.bg, def.bg);
+        assert_eq!(settings.bg_select, def.bg_select);
+    }
+
+    #[test]
+    fn flat_fields_parse_and_apply() {
+        let cfg = parse_config(
+            r#"
+            hotkey = ["ALT", "F2"]
+            matching = "keywords"
+            case_sensitive = true
+            lines = 20
+            width = 640
+            padding = 4
+            font = "Cascadia Code 14"
+            prompt = "Run:"
+        "#,
+        );
+        let (settings, _) = resolve_settings(&cfg);
+        assert_eq!(settings.line_count, 20);
+        assert_eq!(settings.width, 640);
+        assert_eq!(settings.padding, 4);
+        assert_eq!(settings.font_name, "Cascadia Code");
+        assert_eq!(settings.font_size, 14);
+        assert_eq!(settings.prompt.as_deref(), Some("Run:"));
+        assert!(settings.case_sensitive);
+        assert_eq!(cfg.hotkey, Some(vec!["ALT".to_string(), "F2".to_string()]));
+    }
+
+    #[test]
+    fn shipped_config_matches_builtin_defaults() {
+        // `config init` writes DEFAULT_CONFIG; resolving it must reproduce the
+        // no-config appearance exactly (colors + geometry + font).
+        let cfg: MenuConfig = toml::from_str(DEFAULT_CONFIG).expect("shipped config parses");
+        let (settings, warnings) = resolve_settings(&cfg);
+        assert!(warnings.is_empty(), "shipped config warned: {:?}", warnings);
+        let def = default_settings();
+        assert_eq!(settings.bg, def.bg);
+        assert_eq!(settings.fg, def.fg);
+        assert_eq!(settings.bg_select, def.bg_select);
+        assert_eq!(settings.fg_select, def.fg_select);
+        assert_eq!(settings.bg_edit, def.bg_edit);
+        assert_eq!(settings.fg_edit, def.fg_edit);
+        assert_eq!(settings.line_count, def.line_count);
+        assert_eq!(settings.width, def.width);
+        assert_eq!(settings.padding, def.padding);
+        assert_eq!(settings.font_name, def.font_name);
+        assert_eq!(settings.font_size, def.font_size);
     }
 }

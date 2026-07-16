@@ -1,16 +1,12 @@
 # ===============================================================================
-# WindMenu Configuration - dmenu Theme
+# WindMenu Theme Pack — dmenu
 # ===============================================================================
+# Paste this [themes.*] table into your windmenu.toml
 
-[theme]
-lines = 12                          # Number of menu items to display
-padding = 8                         # Horizontal padding in pixels
-width = 1000                        # Window width in pixels
-background_color = "#1e1e1e"        # Window background
-text_color = "#ffffff"              # Window text
-selected_background_color = "#285577"  # Highlighted item background
-selected_text_color = "#ffffff"     # Highlighted item text
-entry_background_color = "#2d2d2d"  # Input box background
-entry_text_color = "#ffffff"        # Input box text
-font = "Consolas 16"                # Font as "Family Size"
-prompt = "Run:"                     # Custom prompt text shown in input box
+[themes.dmenu]
+bg        = "#1e1e1e"   # Window background
+fg        = "#ffffff"   # Window text
+bg_select = "#285577"   # Selected item background
+fg_select = "#ffffff"   # Selected item text
+bg_input  = "#2d2d2d"   # Input box background
+fg_input  = "#ffffff"   # Input box text

@@ -1,65 +1,107 @@
 # ===============================================================================
 # WindMenu Configuration File
 # ===============================================================================
-# This configuration file controls the appearance and behavior of WindMenu,
-# a Windows application launcher with a dmenu-like interface.
+# Controls the appearance and behavior of WindMenu, a Windows application
+# launcher with a dmenu-like interface. Changes apply on daemon restart.
 
-# ===============================================================================
-# DAEMON
-# ===============================================================================
-
-# Custom hotkey (default is ["CTRL", "ALT", "SPACE"])
+# --- Daemon ---
+# Activation hotkey: any number of modifiers (WIN/CTRL/ALT/SHIFT) plus exactly
+# one other key.
+hotkey = ["CTRL", "ALT", "SPACE"]
 # Examples:
-# hotkey = ["CTRL", "ALT", "X"] # Ctrl+Alt+X
-# hotkey = ["ALT", "F2"]        # Alt+F2 (like GNOME)
-# hotkey = ["WIN", "SHIFT", "SPACE"]
+#   hotkey = ["ALT", "F2"]            # (like GNOME)
+#   hotkey = ["WIN", "SHIFT", "SPACE"]
 
-# The hotkey is registered with Windows (RegisterHotKey): any number of
-# modifiers (WIN/CTRL/ALT/SHIFT) plus exactly one other key.
-
-# ===============================================================================
-# SEARCH
-# ===============================================================================
-# How the typed query matches menu entries (search behavior, not appearance).
-
-[search]
-# matching: how the query is compared against each entry
+# --- Search ---
+# matching: how the typed query is compared against each entry
 #   "complete" - whole query matched as a substring
 #   "keywords" - each whitespace-separated word must match
 #   "fuzzy"    - fzf-style subsequence scoring, results sorted by score (default)
 matching = "fuzzy"
-case_sensitive = false              # Match case exactly (default: false)
+case_sensitive = false                # Match case exactly (default: false)
+
+# --- Window ---
+lines = 12                            # Number of menu items to display
+width = 1000                          # Window width in pixels (centers the window)
+padding = 8                           # Horizontal padding in pixels
+font = "Consolas 20"                  # Font as "Family Size" (monospace recommended)
+# prompt = "Run :"                    # Text shown in the input box (default: none)
+
+# --- Colors ---
+# Select a named preset from the [themes.*] tables below.
+theme = "default"
+# Optionally override individual colors (these win over the selected theme):
+#   bg        = "#1e1e1e"   # Window background
+#   fg        = "#ffffff"   # Window text
+#   bg_select = "#0078d4"   # Selected item background
+#   fg_select = "#ffffff"   # Selected item text
+#   bg_input  = "#2d2d2d"   # Input box background
+#   fg_input  = "#ffffff"   # Input box text
 
 # ===============================================================================
-# THEME
+# THEMES
 # ===============================================================================
-# Configure the appearance of the WindMenu interface using descriptive field names.
-# The menu renderer is built into windmenu; changes apply on daemon restart.
+# Each [themes.<name>] defines a color scheme. Add your own or edit these.
 
-[theme]
-lines = 12                          # Number of menu items to display
-padding = 8                         # Horizontal padding in pixels
-width = 1000                        # Window width in pixels
-background_color = "#1e1e2e"        # Window background (Catppuccin Mocha base)
-text_color = "#cdd6f4"              # Window text (Catppuccin Mocha text)
-selected_background_color = "#89b4fa"  # Highlighted item background (Catppuccin Mocha blue)
-selected_text_color = "#1e1e2e"     # Highlighted item text (dark on light)
-entry_background_color = "#313244"  # Input box background (Catppuccin Mocha surface0)
-entry_text_color = "#cdd6f4"        # Input box text (Catppuccin Mocha text)
-font = "Consolas 20"                # Font as "Family Size" (monospace recommended)
-prompt = "Run :"                    # Custom prompt text shown in input box
+# Built-in default (Windows blue) — matches the no-config appearance.
+[themes.default]
+bg        = "#1e1e1e"
+fg        = "#ffffff"
+bg_select = "#0078d4"
+fg_select = "#ffffff"
+bg_input  = "#2d2d2d"
+fg_input  = "#ffffff"
+
+[themes.catppuccin-mocha]
+bg        = "#1e1e2e"
+fg        = "#cdd6f4"
+bg_select = "#89b4fa"
+fg_select = "#1e1e2e"
+bg_input  = "#313244"
+fg_input  = "#cdd6f4"
+
+[themes.catppuccin-frappe]
+bg        = "#303446"
+fg        = "#c6d0f5"
+bg_select = "#8caaee"
+fg_select = "#303446"
+bg_input  = "#414559"
+fg_input  = "#c6d0f5"
+
+[themes.nord]
+bg        = "#2e3440"
+fg        = "#d8dee9"
+bg_select = "#5e81ac"
+fg_select = "#eceff4"
+bg_input  = "#3b4252"
+fg_input  = "#d8dee9"
+
+[themes.dmenu]
+bg        = "#1e1e1e"
+fg        = "#ffffff"
+bg_select = "#285577"
+fg_select = "#ffffff"
+bg_input  = "#2d2d2d"
+fg_input  = "#ffffff"
+
+[themes.hatsunemiku]
+bg        = "#242829"
+fg        = "#dcd7d7"
+bg_select = "#7cc7d6"
+fg_select = "#242829"
+bg_input  = "#333738"
+fg_input  = "#dcd7d7"
 
 # ===============================================================================
 # CUSTOM COMMANDS
 # ===============================================================================
-# Define custom commands that appear in the menu alongside discovered applications.
-# Two command types are supported:
-# - args: Execute shell commands/programs
-# - keys: Send keyboard shortcuts
+# Entries shown alongside discovered applications.
+#   args = [...]  runs a shell command/program
+#   keys = [...]  sends a keyboard shortcut
 
 [[commands]]
 name = "Windows Terminal"
-args = ["wt"] # <-- Shell command
+args = ["wt"]
 
 [[commands]]
 name = "Shutdown"
@@ -79,4 +121,4 @@ args = ["shutdown.exe", "/h"]
 
 [[commands]]
 name = "Maximize Window"
-keys = ["WIN", "UP"] # <-- Keyboard shortcut
+keys = ["WIN", "UP"]

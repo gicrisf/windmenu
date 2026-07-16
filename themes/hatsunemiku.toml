@@ -1,27 +1,16 @@
 # ===============================================================================
-# WindMenu Configuration - Hatsune Miku Theme
+# WindMenu Theme Pack — Hatsune Miku
 # ===============================================================================
+# Paste this [themes.*] table into your windmenu.toml
 
-[theme]
-lines = 12                          # Number of menu items to display
-padding = 8                         # Horizontal padding in pixels
-width = 1000                        # Window width in pixels
-background_color = "#242829"        # Window background (dark gray)
-text_color = "#dcd7d7"              # Window text (light gray)
-selected_background_color = "#7cc7d6"  # Highlighted item background (iconic Miku cyan)
-selected_text_color = "#242829"     # Highlighted item text (dark on light)
-entry_background_color = "#333738"  # Input box background (slightly lighter than base)
-entry_text_color = "#dcd7d7"        # Input box text (light gray)
-font = "Consolas 16"                # Font as "Family Size"
-prompt = "Run:"                     # Custom prompt text shown in input box
+[themes.hatsunemiku]
+bg        = "#242829"   # dark gray
+fg        = "#dcd7d7"   # light gray
+bg_select = "#7cc7d6"   # iconic Miku cyan
+fg_select = "#242829"   # dark on light
+bg_input  = "#333738"   # slightly lighter base
+fg_input  = "#dcd7d7"   # light gray
 
-# ===============================================================================
-# Hatsune Miku Palette Reference
-# ===============================================================================
-# Alternative accent colors you can use for selected_background_color:
-# - Cyan:    #7cc7d6 (default - iconic Miku teal)
-# - Magenta: #bc7fd2 (purple/pink accent)
-# - Pink:    #df2683 (bright pink/red)
-# - Blue:    #1a86b9 (deep blue)
-# - Green:   #13868c (teal-green)
-# - Yellow:  #fcfcdf (cream/pale yellow)
+# Alternative accent colors for bg_select:
+# - Cyan:    #7cc7d6 (current)   - Magenta: #bc7fd2   - Pink:  #df2683
+# - Blue:    #1a86b9             - Green:   #13868c   - Cream: #fcfcdf
