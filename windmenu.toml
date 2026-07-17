@@ -28,69 +28,27 @@ font = "Consolas 20"                  # Font as "Family Size" (monospace recomme
 # prompt = "Run :"                    # Text shown in the input box (default: none)
 
 # --- Colors ---
-# Select a named preset from the [themes.*] tables below.
-theme = "default"
-# Optionally override individual colors (these win over the selected theme):
+# The built-in theme is active by default. To tweak it, uncomment and set any
+# of these (they override the active theme):
 #   bg        = "#1e1e1e"   # Window background
 #   fg        = "#ffffff"   # Window text
 #   bg_select = "#0078d4"   # Selected item background
 #   fg_select = "#ffffff"   # Selected item text
 #   bg_input  = "#2d2d2d"   # Input box background
 #   fg_input  = "#ffffff"   # Input box text
-
-# ===============================================================================
-# THEMES
-# ===============================================================================
-# Each [themes.<name>] defines a color scheme. Add your own or edit these.
-
-# Built-in default (Windows blue) — matches the no-config appearance.
-[themes.default]
-bg        = "#1e1e1e"
-fg        = "#ffffff"
-bg_select = "#0078d4"
-fg_select = "#ffffff"
-bg_input  = "#2d2d2d"
-fg_input  = "#ffffff"
-
-[themes.catppuccin-mocha]
-bg        = "#1e1e2e"
-fg        = "#cdd6f4"
-bg_select = "#89b4fa"
-fg_select = "#1e1e2e"
-bg_input  = "#313244"
-fg_input  = "#cdd6f4"
-
-[themes.catppuccin-frappe]
-bg        = "#303446"
-fg        = "#c6d0f5"
-bg_select = "#8caaee"
-fg_select = "#303446"
-bg_input  = "#414559"
-fg_input  = "#c6d0f5"
-
-[themes.nord]
-bg        = "#2e3440"
-fg        = "#d8dee9"
-bg_select = "#5e81ac"
-fg_select = "#eceff4"
-bg_input  = "#3b4252"
-fg_input  = "#d8dee9"
-
-[themes.dmenu]
-bg        = "#1e1e1e"
-fg        = "#ffffff"
-bg_select = "#285577"
-fg_select = "#ffffff"
-bg_input  = "#2d2d2d"
-fg_input  = "#ffffff"
-
-[themes.hatsunemiku]
-bg        = "#242829"
-fg        = "#dcd7d7"
-bg_select = "#7cc7d6"
-fg_select = "#242829"
-bg_input  = "#333738"
-fg_input  = "#dcd7d7"
+#
+# Themes: define one or more [themes.<name>] color schemes and switch between
+# them with `theme = "<name>"`. Ready-made palettes live in the themes/ folder.
+# Example (uncomment to use):
+#   theme = "nord"
+#
+#   [themes.nord]
+#   bg        = "#2e3440"
+#   fg        = "#d8dee9"
+#   bg_select = "#5e81ac"
+#   fg_select = "#eceff4"
+#   bg_input  = "#3b4252"
+#   fg_input  = "#d8dee9"
 
 # ===============================================================================
 # CUSTOM COMMANDS

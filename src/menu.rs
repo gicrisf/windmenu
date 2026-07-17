@@ -325,9 +325,13 @@ fn resolve_settings(cfg: &MenuConfig) -> (wlines::Settings, Vec<String>) {
     let mut warnings = Vec::new();
 
     // 1. Named theme preset (if any), then 2. per-key overrides win over it.
+    // "default" is a reserved name for the built-in palette (already applied by
+    // default_settings above), so it always resolves silently even without a
+    // [themes.default] table; a user-defined [themes.default] still wins.
     if let Some(ref name) = cfg.theme {
         match cfg.themes.as_ref().and_then(|t| t.get(name)) {
             Some(palette) => palette.apply(&mut settings),
+            None if name == "default" => {}
             None => warnings.push(format!(
                 "theme '{}' not found in [themes.*] — using defaults",
                 name
@@ -1004,6 +1008,15 @@ mod tests {
         );
         let (settings, _) = resolve_settings(&cfg);
         assert_eq!(settings.bg_select, parse_color("#ffffff").unwrap());
+    }
+
+    #[test]
+    fn reserved_default_theme_never_warns() {
+        // "default" resolves to the built-in palette even with no [themes.default].
+        let cfg = parse_config(r#"theme = "default""#);
+        let (settings, warnings) = resolve_settings(&cfg);
+        assert!(warnings.is_empty());
+        assert_eq!(settings.bg, default_settings().bg);
     }
 
     #[test]
