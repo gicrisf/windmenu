@@ -1,16 +1,12 @@
 # ===============================================================================
-# WindMenu Configuration File
+# WindMenu Configuration
 # ===============================================================================
 # Controls the appearance and behavior of WindMenu, a Windows application
 # launcher with a dmenu-like interface. Changes apply on daemon restart.
 
 # --- Daemon ---
-# Activation hotkey: any number of modifiers (WIN/CTRL/ALT/SHIFT) plus exactly
-# one other key.
+# Activation hotkey: any number of modifiers (WIN/CTRL/ALT/SHIFT) plus one other key.
 hotkey = ["CTRL", "ALT", "SPACE"]
-# Examples:
-#   hotkey = ["ALT", "F2"]            # (like GNOME)
-#   hotkey = ["WIN", "SHIFT", "SPACE"]
 
 # --- Search ---
 # matching: how the typed query is compared against each entry
@@ -24,59 +20,31 @@ case_sensitive = false                # Match case exactly (default: false)
 lines = 12                            # Number of menu items to display
 width = 1000                          # Window width in pixels (centers the window)
 padding = 8                           # Horizontal padding in pixels
-font = "Consolas 20"                  # Font as "Family Size" (monospace recommended)
+font = "Consolas 20"                  # Font as "Family Size"
 # prompt = "Run :"                    # Text shown in the input box (default: none)
 
-# --- Colors ---
-# The built-in theme is active by default. To tweak it, uncomment and set any
-# of these (they override the active theme):
-#   bg        = "#1e1e1e"   # Window background
-#   fg        = "#ffffff"   # Window text
-#   bg_select = "#0078d4"   # Selected item background
-#   fg_select = "#ffffff"   # Selected item text
-#   bg_input  = "#2d2d2d"   # Input box background
-#   fg_input  = "#ffffff"   # Input box text
+# --- Theme ---
+# To tweak the built-in theme colors, uncomment and set
+# bg        = "#1e1e1e"   # Window background
+# fg        = "#ffffff"   # Window text
+# bg_select = "#0078d4"   # Selected item background
+# fg_select = "#ffffff"   # Selected item text
+# bg_input  = "#2d2d2d"   # Input box background
+# fg_input  = "#ffffff"   # Input box text
 #
-# Themes: define one or more [themes.<name>] color schemes and switch between
-# them with `theme = "<name>"`. Ready-made palettes live in the themes/ folder.
-# Example (uncomment to use):
-#   theme = "nord"
-#
-#   [themes.nord]
-#   bg        = "#2e3440"
-#   fg        = "#d8dee9"
-#   bg_select = "#5e81ac"
-#   fg_select = "#eceff4"
-#   bg_input  = "#3b4252"
-#   fg_input  = "#d8dee9"
+# Or define your own with  [themes.<name>] using the same keys
+# Switch between them with `theme = "<name>"`
 
-# ===============================================================================
-# CUSTOM COMMANDS
-# ===============================================================================
+# --- Custom Commands ---
 # Entries shown alongside discovered applications.
-#   args = [...]  runs a shell command/program
-#   keys = [...]  sends a keyboard shortcut
-
 [[commands]]
 name = "Windows Terminal"
-args = ["wt"]
+args = ["wt"]                 # Example using `args`: runs a shell command/program
 
 [[commands]]
 name = "Shutdown"
-args = ["shutdown.exe", "/s"]
-
-[[commands]]
-name = "Restart"
-args = ["shutdown.exe", "/r"]
-
-[[commands]]
-name = "Log Off"
-args = ["shutdown.exe", "/l"]
-
-[[commands]]
-name = "Hibernate"
-args = ["shutdown.exe", "/h"]
+args = ["shutdown.exe", "/s"] # Another shell command, this time with flags
 
 [[commands]]
 name = "Maximize Window"
-keys = ["WIN", "UP"]
+keys = ["WIN", "UP"]          # Example using `keys`: keyboard shortcut

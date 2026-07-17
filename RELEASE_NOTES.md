@@ -17,6 +17,7 @@ The menu renderer is now a native Rust module inside `windmenu.exe` — a full p
 
 - Colors use short keys — `bg`, `fg`, `bg_select`, `fg_select`, `bg_input`, `fg_input`. The built-in theme is always active, so a minimal config sets none of them; set any at the top level to tweak it
 - Optional presets for power users: define `[themes.<name>]` blocks and switch with `theme = "<name>"`. `"default"` is reserved for the built-in palette; an unknown name warns (shown in `windmenu config path`) and falls back. Ready-made palettes live in `themes/`
+- Optional `import = [...]` pulls extra `[themes.*]`/`[[commands]]` from pack files (non-recursive, paths relative to the config dir; root wins on name clashes). Missing packs warn and are skipped; `windmenu config path` lists them
 - Run `windmenu config init --force` to regenerate. Old sectioned keys are silently ignored
 
 ## Bug Fixes

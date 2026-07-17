@@ -104,7 +104,10 @@ impl EntryStore {
     }
 
     pub(crate)     fn reload_config(&mut self) {
-        if let Ok((cfg, _)) = MenuConfig::load() {
+        if let Ok((cfg, _dir, warnings)) = load_with_imports() {
+            for warning in warnings {
+                eprintln!("Warning: {}", warning);
+            }
             if let Some(cmds) = cfg.commands {
                 self.apply_config_commands(cmds);
             } else {
@@ -314,6 +317,81 @@ struct MenuConfig {
     themes: Option<HashMap<String, Palette>>,
 
     commands: Option<Vec<CommandConfig>>,
+
+    // Extra theme/command packs pulled in from other TOML files (paths relative
+    // to this config's directory). Non-recursive: packs cannot import further.
+    import: Option<Vec<String>>,
+}
+
+/// An imported pack: a TOML file that contributes only `[themes.*]` and/or
+/// `[[commands]]`. It has no `import` field, so nested imports are ignored
+/// (non-recursive); with no `deny_unknown_fields`, any stray settings a pack
+/// carries are ignored rather than silently overriding the root config.
+#[derive(Debug, Deserialize, Default)]
+struct Pack {
+    themes: Option<HashMap<String, Palette>>,
+    commands: Option<Vec<CommandConfig>>,
+}
+
+/// Fold imported packs into the root config. Root config wins over imports, and
+/// among imports the later one wins — for both themes (merged by name) and
+/// commands. Command name-dedupe happens for free in `apply_config_commands`
+/// (its `HashMap` is last-write-wins), so we only order the vec: imports first,
+/// root last.
+fn merge_packs(cfg: &mut MenuConfig, packs: Vec<Pack>) {
+    let mut themes: HashMap<String, Palette> = HashMap::new();
+    let mut commands: Vec<CommandConfig> = Vec::new();
+    for pack in packs {
+        if let Some(t) = pack.themes {
+            themes.extend(t); // later import overwrites earlier
+        }
+        if let Some(c) = pack.commands {
+            commands.extend(c);
+        }
+    }
+    if let Some(root_themes) = cfg.themes.take() {
+        themes.extend(root_themes); // root wins over every import
+    }
+    if !themes.is_empty() {
+        cfg.themes = Some(themes);
+    }
+    if let Some(root_commands) = cfg.commands.take() {
+        commands.extend(root_commands); // root applied last -> wins in the HashMap
+    }
+    if !commands.is_empty() {
+        cfg.commands = Some(commands);
+    }
+}
+
+/// Read and parse each imported pack (path relative to `base_dir`). A missing or
+/// unparseable file warns and is skipped — imports never abort startup.
+fn read_packs(imports: &[String], base_dir: &Path) -> (Vec<Pack>, Vec<String>) {
+    let mut packs = Vec::new();
+    let mut warnings = Vec::new();
+    for rel in imports {
+        let path = base_dir.join(rel);
+        match fs::read_to_string(&path) {
+            Ok(text) => match toml::from_str::<Pack>(&text) {
+                Ok(pack) => packs.push(pack),
+                Err(e) => warnings.push(format!("import '{}' failed to parse: {}", rel, e)),
+            },
+            Err(_) => warnings.push(format!("import '{}' not found", rel)),
+        }
+    }
+    (packs, warnings)
+}
+
+/// Load the root config and merge any `import`ed packs into it. Returns the
+/// merged config, its directory, and any non-fatal import warnings.
+fn load_with_imports() -> Result<(MenuConfig, PathBuf, Vec<String>), MenuError> {
+    let (mut cfg, config_dir) = MenuConfig::load()?;
+    let mut warnings = Vec::new();
+    if let Some(imports) = cfg.import.take() {
+        let (packs, w) = read_packs(&imports, &config_dir);
+        warnings = w;
+        merge_packs(&mut cfg, packs);
+    }
+    Ok((cfg, config_dir, warnings))
 }
 
 /// Resolve a loaded config into renderer settings, starting from the built-in
@@ -440,8 +518,20 @@ pub fn config_path() {
 
     match MenuConfig::resolve_path() {
         Some(path) => match MenuConfig::load_from_file(&path) {
-            Ok(cfg) => {
+            Ok(mut cfg) => {
                 println!("Result: using {}", path.display());
+                let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+                if let Some(imports) = cfg.import.take() {
+                    for rel in &imports {
+                        let ip = base_dir.join(rel);
+                        println!("Import ({}): {}", ip.display(), if ip.exists() { "found" } else { "not found" });
+                    }
+                    let (packs, import_warnings) = read_packs(&imports, base_dir);
+                    for warning in import_warnings {
+                        println!("Warning: {}", warning);
+                    }
+                    merge_packs(&mut cfg, packs);
+                }
                 let (_, warnings) = resolve_settings(&cfg);
                 for warning in warnings {
                     println!("Warning: {}", warning);
@@ -645,10 +735,10 @@ impl Menu {
         let mut settings = theme::default_settings();
         let entries = Arc::new(RwLock::new(EntryStore::empty()));
 
-        if let Ok((cfg, _config_dir)) = MenuConfig::load() {
+        if let Ok((cfg, _config_dir, import_warnings)) = load_with_imports() {
             let (resolved, warnings) = resolve_settings(&cfg);
             settings = resolved;
-            for warning in warnings {
+            for warning in import_warnings.iter().chain(warnings.iter()) {
                 eprintln!("Warning: {}", warning);
             }
             if let Some(ref keys) = &cfg.hotkey {
@@ -974,12 +1064,16 @@ mod tests {
         );
     }
 
-    use super::{resolve_settings, MenuConfig, DEFAULT_CONFIG};
+    use super::{merge_packs, read_packs, resolve_settings, MenuConfig, Pack, DEFAULT_CONFIG};
     use crate::theme::default_settings;
     use crate::wlines::parse_color;
 
     fn parse_config(s: &str) -> MenuConfig {
         toml::from_str(s).expect("config should parse")
+    }
+
+    fn parse_pack(s: &str) -> Pack {
+        toml::from_str(s).expect("pack should parse")
     }
 
     #[test]
@@ -1075,5 +1169,75 @@ mod tests {
         assert_eq!(settings.padding, def.padding);
         assert_eq!(settings.font_name, def.font_name);
         assert_eq!(settings.font_size, def.font_size);
+    }
+
+    #[test]
+    fn merge_packs_adds_pack_theme() {
+        let mut cfg = parse_config(r#"theme = "nord""#);
+        let pack = parse_pack("[themes.nord]\nbg = \"#2e3440\"\n");
+        merge_packs(&mut cfg, vec![pack]);
+        let (settings, warnings) = resolve_settings(&cfg);
+        assert!(warnings.is_empty());
+        assert_eq!(settings.bg, parse_color("#2e3440").unwrap());
+    }
+
+    #[test]
+    fn merge_packs_root_theme_wins_over_pack() {
+        let mut cfg = parse_config("[themes.nord]\nbg = \"#111111\"\n");
+        let pack = parse_pack("[themes.nord]\nbg = \"#2e3440\"\n");
+        merge_packs(&mut cfg, vec![pack]);
+        let bg = cfg.themes.as_ref().unwrap().get("nord").unwrap().bg.clone();
+        assert_eq!(bg.as_deref(), Some("#111111"));
+    }
+
+    #[test]
+    fn merge_packs_later_import_wins() {
+        let mut cfg = parse_config("");
+        let a = parse_pack("[themes.x]\nbg = \"#aaaaaa\"\n");
+        let b = parse_pack("[themes.x]\nbg = \"#bbbbbb\"\n");
+        merge_packs(&mut cfg, vec![a, b]);
+        let bg = cfg.themes.as_ref().unwrap().get("x").unwrap().bg.clone();
+        assert_eq!(bg.as_deref(), Some("#bbbbbb"));
+    }
+
+    #[test]
+    fn merge_packs_commands_imports_before_root() {
+        let mut cfg = parse_config("[[commands]]\nname = \"Root\"\nargs = [\"r\"]\n");
+        let pack = parse_pack("[[commands]]\nname = \"Pack\"\nargs = [\"p\"]\n");
+        merge_packs(&mut cfg, vec![pack]);
+        let names: Vec<&str> = cfg.commands.as_ref().unwrap().iter().map(|c| c.name.as_str()).collect();
+        // Imports first, root last — so root wins a name clash in apply_config_commands.
+        assert_eq!(names, vec!["Pack", "Root"]);
+    }
+
+    #[test]
+    fn pack_ignores_nested_import_and_stray_keys() {
+        // A pack carries only themes/commands; hotkey/bg/import are silently ignored.
+        let pack = parse_pack(
+            "hotkey = [\"WIN\", \"SPACE\"]\nbg = \"#123456\"\nimport = [\"other.toml\"]\n[themes.z]\nfg = \"#ffffff\"\n",
+        );
+        assert!(pack.themes.as_ref().unwrap().contains_key("z"));
+        assert!(pack.commands.is_none());
+    }
+
+    #[test]
+    fn read_packs_missing_file_warns_and_skips() {
+        let (packs, warnings) = read_packs(&["does-not-exist.toml".to_string()], std::path::Path::new("."));
+        assert!(packs.is_empty());
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("not found"));
+    }
+
+    #[test]
+    fn read_packs_reads_real_file() {
+        let dir = std::env::temp_dir();
+        let name = format!("windmenu-pack-test-{}.toml", std::process::id());
+        let path = dir.join(&name);
+        std::fs::write(&path, "[themes.temp]\nbg = \"#010203\"\n").unwrap();
+        let (packs, warnings) = read_packs(&[name], &dir);
+        let _ = std::fs::remove_file(&path);
+        assert!(warnings.is_empty());
+        assert_eq!(packs.len(), 1);
+        assert!(packs[0].themes.as_ref().unwrap().contains_key("temp"));
     }
 }
