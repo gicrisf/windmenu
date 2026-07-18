@@ -2,9 +2,9 @@
 # WindMenu Theme Pack — Catppuccin
 # ===============================================================================
 # Install with:
-#   windmenu config pack add catppuccin
+#   windmenu config pack install catppuccin
 # Import from windmenu.toml with:
-#   import = ["themes/catppuccin.toml"]
+#   import = ["packs/catppuccin-theme.toml"]
 # Then pick a scheme:
 #   theme = "catppuccin-mocha"
 #   theme = "catppuccin-frappe"

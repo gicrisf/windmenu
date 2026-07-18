@@ -2,9 +2,9 @@
 # WindMenu Theme Pack — dmenu
 # ===============================================================================
 # Install with:
-#   windmenu config pack add dmenu
+#   windmenu config pack install dmenu
 # Import from windmenu.toml with:
-#   import = ["themes/dmenu.toml"]
+#   import = ["packs/dmenu-theme.toml"]
 # Then select the scheme:
 #   theme = "dmenu"
 

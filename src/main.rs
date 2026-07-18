@@ -83,7 +83,7 @@ enum PackAction {
         commands: bool,
     },
     /// Write a bundled pack next to windmenu.toml
-    Add {
+    Install {
         /// Pack name (see `config pack list`)
         name: String,
         /// Overwrite an existing pack file
@@ -413,7 +413,7 @@ fn handle_config_command(action: ConfigAction) {
                 menu::pack_list(themes, commands);
                 0
             }
-            PackAction::Add { name, force } => menu::pack_add(&name, force),
+            PackAction::Install { name, force } => menu::pack_install(&name, force),
             PackAction::Show { name } => menu::pack_show(&name),
         },
     };

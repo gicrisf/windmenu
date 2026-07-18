@@ -583,14 +583,14 @@ pub fn config_init(force: bool) -> i32 {
 }
 
 /// Whether a bundled pack provides colors or commands. Used to filter
-/// `config pack list` and to pick the right paste-line hint on `add`.
+/// `config pack list` and to pick the right paste-line hint on `install`.
 #[derive(PartialEq, Clone, Copy)]
 enum PackKind {
     Theme,
     Command,
 }
 
-/// A theme or command pack bundled into the binary. `config pack add` writes it
+/// A theme or command pack bundled into the binary. `config pack install` writes it
 /// next to windmenu.toml; the content is embedded (`include_str!`) so the single
 /// exe stays self-contained — nothing to download.
 struct EmbeddedPack {
@@ -605,44 +605,44 @@ const EMBEDDED_PACKS: &[EmbeddedPack] = &[
     EmbeddedPack {
         name: "catppuccin",
         kind: PackKind::Theme,
-        path: "themes/catppuccin.toml",
+        path: "packs/catppuccin-theme.toml",
         description: "Catppuccin — Frappé and Mocha color schemes",
-        content: include_str!("../themes/catppuccin.toml"),
+        content: include_str!("../packs/catppuccin-theme.toml"),
     },
     EmbeddedPack {
         name: "dmenu",
         kind: PackKind::Theme,
-        path: "themes/dmenu.toml",
+        path: "packs/dmenu-theme.toml",
         description: "Classic dmenu look",
-        content: include_str!("../themes/dmenu.toml"),
+        content: include_str!("../packs/dmenu-theme.toml"),
     },
     EmbeddedPack {
         name: "hatsunemiku",
         kind: PackKind::Theme,
-        path: "themes/hatsunemiku.toml",
+        path: "packs/hatsunemiku-theme.toml",
         description: "Hatsune Miku cyan",
-        content: include_str!("../themes/hatsunemiku.toml"),
+        content: include_str!("../packs/hatsunemiku-theme.toml"),
     },
     EmbeddedPack {
         name: "power",
         kind: PackKind::Command,
-        path: "commands/power.toml",
+        path: "packs/power-commands.toml",
         description: "Shutdown / restart / log off / hibernate / lock",
-        content: include_str!("../commands/power.toml"),
+        content: include_str!("../packs/power-commands.toml"),
     },
     EmbeddedPack {
         name: "windows-tools",
         kind: PackKind::Command,
-        path: "commands/windows-tools.toml",
+        path: "packs/windows-tools-commands.toml",
         description: "Device Manager, Services, Event Viewer, and other consoles",
-        content: include_str!("../commands/windows-tools.toml"),
+        content: include_str!("../packs/windows-tools-commands.toml"),
     },
     EmbeddedPack {
         name: "wt-keys",
         kind: PackKind::Command,
-        path: "commands/wt-keys.toml",
+        path: "packs/wt-keys-commands.toml",
         description: "Windows Terminal keybindings - tab/pane/font management",
-        content: include_str!("../commands/wt-keys.toml"),
+        content: include_str!("../packs/wt-keys-commands.toml"),
     },
 ];
 
@@ -650,7 +650,7 @@ fn find_pack(name: &str) -> Option<&'static EmbeddedPack> {
     EMBEDDED_PACKS.iter().find(|p| p.name == name)
 }
 
-/// Where `config pack add` installs a pack: next to the resolved windmenu.toml if
+/// Where `config pack install` installs a pack: next to the resolved windmenu.toml if
 /// one exists, else the executable's directory (matching `config init`).
 fn pack_base_dir() -> PathBuf {
     if let Some(parent) = MenuConfig::resolve_path().as_ref().and_then(|p| p.parent()) {
@@ -680,16 +680,16 @@ pub fn pack_list(themes_only: bool, commands_only: bool) {
         }
     }
     println!();
-    println!("Install one with:  windmenu config pack add <name>");
+    println!("Install one with:  windmenu config pack install <name>");
 }
 
-/// `config pack add`: write a bundled pack next to windmenu.toml and print the
+/// `config pack install`: write a bundled pack next to windmenu.toml and print the
 /// line to add to `import`. Never edits the config itself. Returns an exit code.
-pub fn pack_add(name: &str, force: bool) -> i32 {
+pub fn pack_install(name: &str, force: bool) -> i32 {
     let pack = match find_pack(name) {
         Some(p) => p,
         None => {
-            eprintln!("config pack add: unknown pack '{}'. Available:", name);
+            eprintln!("config pack install: unknown pack '{}'. Available:", name);
             for p in EMBEDDED_PACKS {
                 eprintln!("  {}", p.name);
             }
@@ -699,17 +699,17 @@ pub fn pack_add(name: &str, force: bool) -> i32 {
 
     let target = pack_base_dir().join(pack.path);
     if target.exists() && !force {
-        eprintln!("config pack add: {} already exists; use --force to overwrite", target.display());
+        eprintln!("config pack install: {} already exists; use --force to overwrite", target.display());
         return 1;
     }
     if let Some(parent) = target.parent() {
         if let Err(e) = fs::create_dir_all(parent) {
-            eprintln!("config pack add: failed to create {}: {}", parent.display(), e);
+            eprintln!("config pack install: failed to create {}: {}", parent.display(), e);
             return 1;
         }
     }
     if let Err(e) = fs::write(&target, pack.content) {
-        eprintln!("config pack add: failed to write {}: {}", target.display(), e);
+        eprintln!("config pack install: failed to write {}: {}", target.display(), e);
         return 1;
     }
 
@@ -1410,7 +1410,7 @@ mod tests {
     #[test]
     fn shipped_packs_parse() {
         // Every bundled pack must be a valid Pack, so a typo in an example never
-        // reaches users (and every `config pack add` target is well-formed). For
+        // reaches users (and every `config pack install` target is well-formed). For
         // keybinding commands, also check each key resolves to a VK code —
         // otherwise a bad token would fail only when the user triggers the entry.
         for pack in super::EMBEDDED_PACKS {
