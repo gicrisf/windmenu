@@ -1,7 +1,12 @@
 # ===============================================================================
 # WindMenu Theme Pack — dmenu
 # ===============================================================================
-# Paste this [themes.*] table into your windmenu.toml
+# Install with:
+#   windmenu config pack add dmenu
+# Import from windmenu.toml with:
+#   import = ["themes/dmenu.toml"]
+# Then select the scheme:
+#   theme = "dmenu"
 
 [themes.dmenu]
 bg        = "#1e1e1e"   # Window background

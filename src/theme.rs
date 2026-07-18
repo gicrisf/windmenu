@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::wlines::{self, Settings};
 
-/// A menu color scheme: the six colors a `[themes.<name>]` preset defines, and
+/// A menu color scheme: the six colors a `[themes.<name>]` theme defines, and
 /// the same keys usable as top-level overrides. Config keys are short
 /// (`bg`/`fg`/…); `bg_input`/`fg_input` map to the renderer's input-box fields
 /// (`bg_edit`/`fg_edit`).

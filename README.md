@@ -78,6 +78,35 @@ hotkey = ["CTRL", "ALT", "SPACE"]  # Default
 
 For full configuration options, check the [example windmenu.toml](https://github.com/gicrisf/windmenu/blob/main/windmenu.toml) in the repository.
 
+## Theming
+
+Windmenu ships with a built-in color scheme (a Windows-blue dark look) that is always active — a fresh config needs no color settings at all. To tweak it, set any of the six color keys at the top level of `windmenu.toml`; they override the active theme:
+
+```toml
+bg        = "#1e1e1e"   # Window background
+fg        = "#ffffff"   # Window text
+bg_select = "#0078d4"   # Selected item background
+fg_select = "#ffffff"   # Selected item text
+bg_input  = "#2d2d2d"   # Input box background
+fg_input  = "#ffffff"   # Input box text
+```
+
+To keep several color schemes on hand, define named themes and switch between them with `theme`:
+
+```toml
+theme = "nord"
+
+[themes.nord]
+bg        = "#2e3440"
+fg        = "#d8dee9"
+bg_select = "#5e81ac"
+fg_select = "#eceff4"
+bg_input  = "#3b4252"
+fg_input  = "#d8dee9"
+```
+
+`theme = "default"` is reserved for the built-in scheme, so you can always switch back. An unknown theme name is never fatal — windmenu warns (visible in `windmenu config path`) and keeps the built-in colors. Top-level color keys always win over the selected theme, so you can pick a theme and still override just its accent.
+
 ## Commands
 
 The menu is populated from three sources:
@@ -201,6 +230,36 @@ keys = ["WIN", "CTRL", "1"]
 ```
 
 The menu will display both types of commands and execute them appropriately based on their configuration.
+
+## Config packs (import)
+
+Large sets of themes or commands can live in separate files and be pulled in with `import` (paths are relative to your `windmenu.toml`):
+
+```toml
+import = ["themes/catppuccin.toml", "commands/power.toml"]
+```
+
+An imported pack is an ordinary config file that contains only `[themes.*]` tables and/or `[[commands]]` entries — any other keys are ignored. Importing is **non-recursive**: a pack cannot import further packs. A missing or malformed pack is not fatal — windmenu warns and skips it (the warning shows up under `windmenu config path`) rather than failing to start.
+
+Merge order is predictable: your `windmenu.toml` always wins over imports, and among imports the last one listed wins. So a `[themes.nord]` or a command named `Shutdown` in your main file overrides one of the same name from a pack.
+
+Windmenu bundles a few ready-made packs. List them, then install one next to your config:
+
+```bash
+windmenu config pack list            # what's available (--themes / --commands to filter)
+windmenu config pack add catppuccin  # writes themes/catppuccin.toml + prints the import line
+windmenu config pack show catppuccin # preview without installing
+```
+
+Bundled packs:
+
+- `catppuccin` — Catppuccin Frappé and Mocha themes
+- `dmenu`, `hatsunemiku` — more themes
+- `power` — shutdown / restart / log off / hibernate / lock
+- `windows-tools` — Device Manager, Services, Event Viewer, and other consoles
+- `windows-terminal-keybindings` — Windows Terminal tab / pane / font shortcuts
+
+`config pack add` writes the file and prints the `import` line to paste — it never edits your config for you. A single theme pack can define several schemes at once: after adding `catppuccin`, both `theme = "catppuccin-frappe"` and `theme = "catppuccin-mocha"` are available.
 
 ## Build
 

@@ -1,7 +1,12 @@
 # ===============================================================================
 # WindMenu Theme Pack — Hatsune Miku
 # ===============================================================================
-# Paste this [themes.*] table into your windmenu.toml
+# Install with:
+#   windmenu config pack add hatsunemiku
+# Import from windmenu.toml with:
+#   import = ["themes/hatsunemiku.toml"]
+# Then select the scheme:
+#   theme = "hatsunemiku"
 
 [themes.hatsunemiku]
 bg        = "#242829"   # dark gray

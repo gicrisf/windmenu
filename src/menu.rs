@@ -310,7 +310,7 @@ struct MenuConfig {
     font: Option<String>,   // Font as "Family Size", e.g. "Consolas 18"
     prompt: Option<String>, // Text shown in the input box
 
-    // Color scheme: pick a named preset, then override individual keys.
+    // Color scheme: pick a named theme, then override individual keys.
     theme: Option<String>,               // Selects [themes.<name>]
     #[serde(flatten)]
     colors: Palette,                     // Top-level color overrides
@@ -402,7 +402,7 @@ fn resolve_settings(cfg: &MenuConfig) -> (wlines::Settings, Vec<String>) {
     let mut settings = theme::default_settings();
     let mut warnings = Vec::new();
 
-    // 1. Named theme preset (if any), then 2. per-key overrides win over it.
+    // 1. Named theme (if any), then 2. per-key overrides win over it.
     // "default" is a reserved name for the built-in palette (already applied by
     // default_settings above), so it always resolves silently even without a
     // [themes.default] table; a user-defined [themes.default] still wins.
@@ -580,6 +580,172 @@ pub fn config_init(force: bool) -> i32 {
     println!("Wrote default config to {}", target.display());
     println!("{}", RESTART_REMINDER);
     0
+}
+
+/// Whether a bundled pack provides colors or commands. Used to filter
+/// `config pack list` and to pick the right paste-line hint on `add`.
+#[derive(PartialEq, Clone, Copy)]
+enum PackKind {
+    Theme,
+    Command,
+}
+
+/// A theme or command pack bundled into the binary. `config pack add` writes it
+/// next to windmenu.toml; the content is embedded (`include_str!`) so the single
+/// exe stays self-contained — nothing to download.
+struct EmbeddedPack {
+    name: &'static str,
+    kind: PackKind,
+    path: &'static str, // install path, relative to the config directory
+    description: &'static str,
+    content: &'static str,
+}
+
+const EMBEDDED_PACKS: &[EmbeddedPack] = &[
+    EmbeddedPack {
+        name: "catppuccin",
+        kind: PackKind::Theme,
+        path: "themes/catppuccin.toml",
+        description: "Catppuccin — Frappé and Mocha color schemes",
+        content: include_str!("../themes/catppuccin.toml"),
+    },
+    EmbeddedPack {
+        name: "dmenu",
+        kind: PackKind::Theme,
+        path: "themes/dmenu.toml",
+        description: "Classic dmenu look",
+        content: include_str!("../themes/dmenu.toml"),
+    },
+    EmbeddedPack {
+        name: "hatsunemiku",
+        kind: PackKind::Theme,
+        path: "themes/hatsunemiku.toml",
+        description: "Hatsune Miku cyan",
+        content: include_str!("../themes/hatsunemiku.toml"),
+    },
+    EmbeddedPack {
+        name: "power",
+        kind: PackKind::Command,
+        path: "commands/power.toml",
+        description: "Shutdown / restart / log off / hibernate / lock",
+        content: include_str!("../commands/power.toml"),
+    },
+    EmbeddedPack {
+        name: "windows-tools",
+        kind: PackKind::Command,
+        path: "commands/windows-tools.toml",
+        description: "Device Manager, Services, Event Viewer, and other consoles",
+        content: include_str!("../commands/windows-tools.toml"),
+    },
+    EmbeddedPack {
+        name: "wt-keys",
+        kind: PackKind::Command,
+        path: "commands/wt-keys.toml",
+        description: "Windows Terminal keybindings - tab/pane/font management",
+        content: include_str!("../commands/wt-keys.toml"),
+    },
+];
+
+fn find_pack(name: &str) -> Option<&'static EmbeddedPack> {
+    EMBEDDED_PACKS.iter().find(|p| p.name == name)
+}
+
+/// Where `config pack add` installs a pack: next to the resolved windmenu.toml if
+/// one exists, else the executable's directory (matching `config init`).
+fn pack_base_dir() -> PathBuf {
+    if let Some(parent) = MenuConfig::resolve_path().as_ref().and_then(|p| p.parent()) {
+        return parent.to_path_buf();
+    }
+    env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+/// `config pack list`: list bundled packs, optionally filtered by kind. With
+/// neither or both flags, all packs are shown.
+pub fn pack_list(themes_only: bool, commands_only: bool) {
+    let all = themes_only == commands_only;
+    for pack in EMBEDDED_PACKS {
+        let show = match pack.kind {
+            PackKind::Theme => all || themes_only,
+            PackKind::Command => all || commands_only,
+        };
+        if show {
+            let kind = match pack.kind {
+                PackKind::Theme => "theme",
+                PackKind::Command => "command",
+            };
+            println!("{:<16} [{:>7}]  {}", pack.name, kind, pack.description);
+        }
+    }
+    println!();
+    println!("Install one with:  windmenu config pack add <name>");
+}
+
+/// `config pack add`: write a bundled pack next to windmenu.toml and print the
+/// line to add to `import`. Never edits the config itself. Returns an exit code.
+pub fn pack_add(name: &str, force: bool) -> i32 {
+    let pack = match find_pack(name) {
+        Some(p) => p,
+        None => {
+            eprintln!("config pack add: unknown pack '{}'. Available:", name);
+            for p in EMBEDDED_PACKS {
+                eprintln!("  {}", p.name);
+            }
+            return 1;
+        }
+    };
+
+    let target = pack_base_dir().join(pack.path);
+    if target.exists() && !force {
+        eprintln!("config pack add: {} already exists; use --force to overwrite", target.display());
+        return 1;
+    }
+    if let Some(parent) = target.parent() {
+        if let Err(e) = fs::create_dir_all(parent) {
+            eprintln!("config pack add: failed to create {}: {}", parent.display(), e);
+            return 1;
+        }
+    }
+    if let Err(e) = fs::write(&target, pack.content) {
+        eprintln!("config pack add: failed to write {}: {}", target.display(), e);
+        return 1;
+    }
+
+    println!("Wrote {}", target.display());
+    println!();
+    println!("Add to windmenu.toml:");
+    println!("  import = [\"{}\"]", pack.path);
+    if pack.kind == PackKind::Theme {
+        if let Some(themes) = toml::from_str::<Pack>(pack.content).ok().and_then(|p| p.themes) {
+            let mut names: Vec<&String> = themes.keys().collect();
+            names.sort();
+            if let Some((first, rest)) = names.split_first() {
+                println!("Then select a scheme, e.g.:");
+                println!("  theme = \"{}\"", first);
+                if !rest.is_empty() {
+                    let rest: Vec<&str> = rest.iter().map(|s| s.as_str()).collect();
+                    println!("  (also: {})", rest.join(", "));
+                }
+            }
+        }
+    }
+    0
+}
+
+/// `config pack show`: print a bundled pack to stdout. Returns an exit code.
+pub fn pack_show(name: &str) -> i32 {
+    match find_pack(name) {
+        Some(pack) => {
+            print!("{}", pack.content);
+            0
+        }
+        None => {
+            eprintln!("config pack show: unknown pack '{}'", name);
+            1
+        }
+    }
 }
 
 /// `config edit`: open the resolved config in an editor, creating it first if
@@ -1077,7 +1243,7 @@ mod tests {
     }
 
     #[test]
-    fn theme_preset_is_applied() {
+    fn named_theme_is_applied() {
         let cfg = parse_config(
             r##"
             theme = "nord"
@@ -1091,7 +1257,7 @@ mod tests {
     }
 
     #[test]
-    fn override_beats_preset() {
+    fn override_beats_theme() {
         let cfg = parse_config(
             r##"
             theme = "nord"
@@ -1239,5 +1405,27 @@ mod tests {
         assert!(warnings.is_empty());
         assert_eq!(packs.len(), 1);
         assert!(packs[0].themes.as_ref().unwrap().contains_key("temp"));
+    }
+
+    #[test]
+    fn shipped_packs_parse() {
+        // Every bundled pack must be a valid Pack, so a typo in an example never
+        // reaches users (and every `config pack add` target is well-formed). For
+        // keybinding commands, also check each key resolves to a VK code —
+        // otherwise a bad token would fail only when the user triggers the entry.
+        for pack in super::EMBEDDED_PACKS {
+            let parsed: Pack = toml::from_str(pack.content)
+                .unwrap_or_else(|e| panic!("{} failed to parse: {}", pack.path, e));
+            for cmd in parsed.commands.into_iter().flatten() {
+                let name = cmd.name;
+                if let super::CommandType::Keys { keys } = cmd.command_type {
+                    for key in &keys {
+                        super::Menu::parse_key_name_to_vk_code(key).unwrap_or_else(|_| {
+                            panic!("{}: '{}' uses unknown key '{}'", pack.path, name, key)
+                        });
+                    }
+                }
+            }
+        }
     }
 }

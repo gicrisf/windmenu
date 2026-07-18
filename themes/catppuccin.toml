@@ -1,7 +1,13 @@
 # ===============================================================================
 # WindMenu Theme Pack — Catppuccin
 # ===============================================================================
-# Paste these [themes.*] table into your windmenu.toml
+# Install with:
+#   windmenu config pack add catppuccin
+# Import from windmenu.toml with:
+#   import = ["themes/catppuccin.toml"]
+# Then pick a scheme:
+#   theme = "catppuccin-mocha"
+#   theme = "catppuccin-frappe"
 
 [themes.catppuccin-frappe]
 bg        = "#303446"   # base

@@ -64,6 +64,37 @@ enum ConfigAction {
     Path,
     /// Open the config in an editor (creating it if needed)
     Edit,
+    /// Manage bundled theme/command packs
+    Pack {
+        #[command(subcommand)]
+        action: PackAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum PackAction {
+    /// List bundled packs
+    List {
+        /// Only theme packs
+        #[arg(long)]
+        themes: bool,
+        /// Only command packs
+        #[arg(long)]
+        commands: bool,
+    },
+    /// Write a bundled pack next to windmenu.toml
+    Add {
+        /// Pack name (see `config pack list`)
+        name: String,
+        /// Overwrite an existing pack file
+        #[arg(long)]
+        force: bool,
+    },
+    /// Print a bundled pack to stdout
+    Show {
+        /// Pack name (see `config pack list`)
+        name: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -377,6 +408,14 @@ fn handle_config_command(action: ConfigAction) {
             0
         }
         ConfigAction::Edit => menu::config_edit(),
+        ConfigAction::Pack { action } => match action {
+            PackAction::List { themes, commands } => {
+                menu::pack_list(themes, commands);
+                0
+            }
+            PackAction::Add { name, force } => menu::pack_add(&name, force),
+            PackAction::Show { name } => menu::pack_show(&name),
+        },
     };
     if code != 0 {
         cli_exit(code);
