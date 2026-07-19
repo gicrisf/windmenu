@@ -126,9 +126,6 @@ enum TestType {
     /// Test and display reparse points
     #[command(name = "reparse-points")]
     ReparsePoints,
-    /// Show config resolution paths
-    #[command(name = "config")]
-    Config,
 }
 
 /// Find an executable on PATH using where.exe.
@@ -426,9 +423,6 @@ fn handle_test_command(test_type: TestType) {
     match test_type {
         TestType::ReparsePoints => {
             print_reparse_points_info();
-        }
-        TestType::Config => {
-            menu::config_path();
         }
     }
 }

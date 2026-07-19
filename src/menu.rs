@@ -11,7 +11,6 @@ use std::os::windows::ffi::OsStrExt;
 use std::os::windows::process::CommandExt;
 use std::fmt;
 use serde::Deserialize;
-use toml;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::shellapi::ShellExecuteW;
 use winapi::um::winuser::{
@@ -501,7 +500,7 @@ impl MenuConfig {
     }
 }
 
-/// `config path` / `test config`: report where windmenu looks for its config
+/// `config path`: report where windmenu looks for its config
 /// and which file (if any) is currently in effect.
 pub fn config_path() {
     let exe_path = env::current_exe().ok();
@@ -893,7 +892,7 @@ fn find_lnk_files(dir: &Path) -> std::io::Result<HashMap<String, PathBuf>> {
 
         if path.is_dir() {
             lnk_files.extend(find_lnk_files(&path)?);
-        } else if path.extension().map_or(false, |ext| ext == "lnk") {
+        } else if path.extension().is_some_and(|ext| ext == "lnk") {
             if let Some(file_name) = path.file_stem().and_then(|n| n.to_str()) {
                 lnk_files.insert(file_name.to_lowercase().to_string(), path);
             }

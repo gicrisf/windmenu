@@ -362,7 +362,7 @@ unsafe fn state_from_wnd<'a>(wnd: HWND) -> Option<&'a mut State> {
 }
 
 unsafe fn call_orig_edit(state: &State, wnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    CallWindowProcW(mem::transmute(state.edit_proc), wnd, msg, wparam, lparam)
+    CallWindowProcW(mem::transmute::<isize, Option<unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT>>(state.edit_proc), wnd, msg, wparam, lparam)
 }
 
 unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -468,7 +468,7 @@ unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
                     // Page Up - Previous page
                     if state.line_count > 0 {
                         if let Some(sel) = state.selected {
-                            let page = sel / state.line_count;
+                            let page = sel.checked_div(state.line_count).unwrap_or(0);
                             let target = page.saturating_sub(1) * state.line_count;
                             set_selection(state, target);
                         }
@@ -479,7 +479,7 @@ unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
                     // Page Down - Next page
                     if state.line_count > 0 {
                         if let Some(sel) = state.selected {
-                            let target = (sel / state.line_count + 1) * state.line_count;
+                            let target = (sel.checked_div(state.line_count).unwrap_or(0) + 1) * state.line_count;
                             set_selection(state, target);
                         }
                     }
@@ -781,7 +781,7 @@ unsafe fn show_inner(settings: &Settings, entries: &[String]) -> Option<String> 
 
     let font_name = to_wide(&settings.font_name);
     let font = CreateFontW(settings.font_size, 0, 0, 0,
-        FW_NORMAL as i32, 0, 0, 0, 0, 0, 0, 0x04, 0, font_name.as_ptr());
+        FW_NORMAL, 0, 0, 0, 0, 0, 0, 0x04, 0, font_name.as_ptr());
     if font.is_null() {
         eprintln!("wlines: CreateFontW failed: error {}", GetLastError());
         return None;
