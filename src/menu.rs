@@ -568,9 +568,9 @@ impl MenuConfig {
     }
 }
 
-/// `config path`: report where windmenu looks for its config
-/// and which file (if any) is currently in effect.
-pub fn config_path() {
+/// Report where windmenu looks for its config and which file (if any) is
+/// currently in effect. Used by `windmenu doctor`.
+pub fn config_diagnostics() {
     let exe_path = env::current_exe().ok();
     println!("Exe path: {}", exe_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "unknown".into()));
     println!("CWD: {}", env::current_dir().map(|p| p.display().to_string()).unwrap_or_else(|_| "unknown".into()));

@@ -1,11 +1,12 @@
 ## Flatter CLI (0.7.0)
 
-- Daemon commands are now top-level: `windmenu start` / `stop` / `restart` / `status` (previously nested under `windmenu daemon …`). Bare `windmenu` now prints help instead of starting the daemon — use `windmenu start`
+- Daemon commands are now top-level: `windmenu start` / `stop` / `restart` (previously nested under `windmenu daemon …`). Bare `windmenu` now prints help instead of starting the daemon — use `windmenu start`
 - **Breaking:** the `windmenu daemon …` subcommand group is gone — update any scripts, shortcuts, or Run-key entries to the flat form
+- New `windmenu doctor` replaces `windmenu status` and `windmenu config path`: one command reports config resolution + warnings, the binary location and whether it's on PATH, daemon running state, and the active auto-start method (Startup-folder shortcut and a read-only probe of the `HKCU\…\Run\WindmenuDaemon` registry key). **Breaking:** `windmenu status` and `windmenu config path` are removed
 
 ## Auto-start moved out of the app (0.7.0)
 
-- windmenu no longer manages auto-start itself: the `windmenu daemon enable/disable` commands and the built-in Registry/Startup-folder logic (and the `mslnk` dependency) have been removed. `status` now reports only whether the daemon is running
+- windmenu no longer manages auto-start itself: the `windmenu daemon enable/disable` commands and the built-in Registry/Startup-folder logic (and the `mslnk` dependency) have been removed. `windmenu doctor` reports the daemon running state and the auto-start method in effect
 - Auto-start is now a plain Startup-folder shortcut (or registry Run-key entry) you create once. The NSIS installer and the Scoop/PowerShell installers set it up for you; the README documents the two-line PowerShell to enable/disable it manually
 
 ## Horizontal bar mode (0.7.0)

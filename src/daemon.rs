@@ -144,21 +144,4 @@ impl WindmenuDaemon {
         // Start the daemon
         self.start()
     }
-
-    pub fn get_status(&self) -> DaemonStatus {
-        DaemonStatus {
-            is_running: self.is_running(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DaemonStatus {
-    pub is_running: bool,
-}
-
-impl fmt::Display for DaemonStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "  Running: {}", if self.is_running { "Yes" } else { "No" })
-    }
 }

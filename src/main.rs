@@ -11,6 +11,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 
 mod apps;
 mod daemon;
+mod doctor;
 mod menu;
 mod theme;
 mod wlines;
@@ -40,8 +41,8 @@ enum Commands {
     Stop,
     /// Restart the background daemon
     Restart,
-    /// Check whether the daemon is running
-    Status,
+    /// Report config, binary, daemon, and auto-start diagnostics
+    Doctor,
     /// Manage the windmenu.toml configuration
     Config {
         #[command(subcommand)]
@@ -62,8 +63,6 @@ enum ConfigAction {
         #[arg(long)]
         force: bool,
     },
-    /// Show config resolution paths and the file in use
-    Path,
     /// Open the config in an editor (creating it if needed)
     Edit,
     /// Manage bundled theme/command packs
@@ -108,7 +107,7 @@ enum TestType {
 
 /// Find an executable on PATH using where.exe.
 /// Returns the first match, which for Scoop installs will be the stable shim path.
-fn find_on_path(exe_name: &str) -> Option<PathBuf> {
+pub(crate) fn find_on_path(exe_name: &str) -> Option<PathBuf> {
     std::process::Command::new("where.exe")
         .arg(exe_name)
         .output()
@@ -263,7 +262,7 @@ fn main() {
         Some(Commands::Start) => start_daemon(&windmenu_daemon),
         Some(Commands::Stop) => stop_daemon(&windmenu_daemon),
         Some(Commands::Restart) => restart_daemon(&windmenu_daemon),
-        Some(Commands::Status) => status_daemon(&windmenu_daemon),
+        Some(Commands::Doctor) => doctor::run(&windmenu_daemon),
         Some(Commands::Config { action }) => {
             handle_config_command(action);
         }
@@ -325,19 +324,9 @@ fn restart_daemon(daemon: &WindmenuDaemon) {
     }
 }
 
-fn status_daemon(daemon: &WindmenuDaemon) {
-    let status = daemon.get_status();
-    println!("windmenu daemon status:");
-    print!("{}", status);
-}
-
 fn handle_config_command(action: ConfigAction) {
     let code = match action {
         ConfigAction::Init { force } => menu::config_init(force),
-        ConfigAction::Path => {
-            menu::config_path();
-            0
-        }
         ConfigAction::Edit => menu::config_edit(),
         ConfigAction::Pack { action } => match action {
             PackAction::List { themes, commands } => {
