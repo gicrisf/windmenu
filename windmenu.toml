@@ -16,6 +16,12 @@ hotkey = ["CTRL", "ALT", "SPACE"]
 matching = "fuzzy"
 case_sensitive = false                # Match case exactly (default: false)
 
+# --- Navigation ---
+# Keys that move the selection while the menu is open (CTRL/SHIFT + one key).
+# Defaults are Ctrl+J / Ctrl+K; arrow keys always work regardless of this.
+# next = ["CTRL", "J"]                 # Move selection down
+# prev = ["CTRL", "K"]                 # Move selection up
+
 # --- Window ---
 lines = 12                            # Number of menu items to display
 width = 1000                          # Window width in pixels (centers the window)

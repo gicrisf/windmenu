@@ -298,6 +298,10 @@ pub fn error_box(message: &str) {
 struct MenuConfig {
     hotkey: Option<Vec<String>>, // Custom hotkey keys (e.g., ["WIN", "SPACE"])
 
+    // In-menu navigation combos (CTRL/SHIFT + one key). Default Ctrl+J / Ctrl+K.
+    next: Option<Vec<String>>, // Move selection down
+    prev: Option<Vec<String>>, // Move selection up
+
     // Search behavior (rofi's -matching / -case-sensitive).
     matching: Option<String>,     // "complete" / "keywords" / "fuzzy"
     case_sensitive: Option<bool>, // Match case exactly (default: false)
@@ -397,6 +401,50 @@ fn load_with_imports() -> Result<(MenuConfig, PathBuf, Vec<String>), MenuError> 
 /// defaults. Returns any non-fatal warnings (e.g. an unknown theme name) so
 /// callers can surface them. A missing theme is not fatal: the launcher keeps
 /// the default palette and runs.
+/// Parse a navigation keybinding (`["CTRL", "J"]`) into a `wlines::KeyCombo`.
+/// Accepts any mix of CTRL/SHIFT modifiers plus exactly one other key. ALT/WIN
+/// are rejected: those keydowns arrive as WM_SYSKEYDOWN, which the menu renderer
+/// doesn't handle, so they'd never fire.
+fn parse_key_combo(keys: &[String]) -> Result<wlines::KeyCombo, MenuError> {
+    let mut ctrl = false;
+    let mut shift = false;
+    let mut vk: Option<u16> = None;
+
+    for key in keys {
+        match key.to_uppercase().as_str() {
+            "CTRL" | "CONTROL" => ctrl = true,
+            "SHIFT" => shift = true,
+            "ALT" | "WIN" | "WINDOWS" => {
+                return Err(MenuError::InvalidArguments(format!(
+                    "navigation combo {:?} uses ALT/WIN, which are unsupported; \
+                     use CTRL/SHIFT plus exactly one other key",
+                    keys
+                )));
+            }
+            _ => {
+                let code = Menu::parse_key_name_to_vk_code(key)?;
+                if vk.is_some() {
+                    return Err(MenuError::InvalidArguments(format!(
+                        "navigation combo {:?} has more than one non-modifier key; \
+                         use CTRL/SHIFT plus exactly one other key",
+                        keys
+                    )));
+                }
+                vk = Some(code);
+            }
+        }
+    }
+
+    match vk {
+        Some(vk) => Ok(wlines::KeyCombo { ctrl, shift, vk }),
+        None => Err(MenuError::InvalidArguments(format!(
+            "navigation combo {:?} has no non-modifier key; \
+             use CTRL/SHIFT plus exactly one other key",
+            keys
+        ))),
+    }
+}
+
 fn resolve_settings(cfg: &MenuConfig) -> (wlines::Settings, Vec<String>) {
     let mut settings = theme::default_settings();
     let mut warnings = Vec::new();
@@ -441,6 +489,19 @@ fn resolve_settings(cfg: &MenuConfig) -> (wlines::Settings, Vec<String>) {
     }
     if let Some(case_sensitive) = cfg.case_sensitive {
         settings.case_sensitive = case_sensitive;
+    }
+
+    // 5. Navigation combos: warn and keep the default (Ctrl+J/K) on bad config.
+    for (label, keys, slot) in [
+        ("next", &cfg.next, &mut settings.next),
+        ("prev", &cfg.prev, &mut settings.prev),
+    ] {
+        if let Some(keys) = keys {
+            match parse_key_combo(keys) {
+                Ok(combo) => *slot = combo,
+                Err(e) => warnings.push(format!("{} keybinding invalid: {} — using default", label, e)),
+            }
+        }
     }
 
     (settings, warnings)
@@ -1186,7 +1247,53 @@ impl Menu {
 
 #[cfg(test)]
 mod tests {
-    use super::split_command;
+    use super::{parse_key_combo, split_command};
+    use crate::wlines::KeyCombo;
+
+    fn combo(keys: &[&str]) -> Result<KeyCombo, super::MenuError> {
+        parse_key_combo(&keys.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn key_combo_ctrl_letter() {
+        assert_eq!(
+            combo(&["CTRL", "J"]).unwrap(),
+            KeyCombo { ctrl: true, shift: false, vk: 0x4A }
+        );
+    }
+
+    #[test]
+    fn key_combo_ctrl_shift() {
+        assert_eq!(
+            combo(&["CTRL", "SHIFT", "N"]).unwrap(),
+            KeyCombo { ctrl: true, shift: true, vk: 0x4E }
+        );
+    }
+
+    #[test]
+    fn key_combo_rejects_bad_key() {
+        assert!(combo(&["CTRL", "NOPE"]).is_err());
+    }
+
+    #[test]
+    fn key_combo_rejects_two_non_modifiers() {
+        assert!(combo(&["CTRL", "J", "K"]).is_err());
+    }
+
+    #[test]
+    fn key_combo_rejects_alt() {
+        assert!(combo(&["ALT", "J"]).is_err());
+    }
+
+    #[test]
+    fn key_combo_char_to_swallow() {
+        // Ctrl+letter yields the control char the EDIT control would insert.
+        assert_eq!(combo(&["CTRL", "J"]).unwrap().char_to_swallow(), Some(0x0A));
+        assert_eq!(combo(&["CTRL", "K"]).unwrap().char_to_swallow(), Some(0x0B));
+        assert_eq!(combo(&["CTRL", "N"]).unwrap().char_to_swallow(), Some(0x0E));
+        // A non-ctrl combo produces nothing to swallow.
+        assert_eq!(combo(&["SHIFT", "J"]).unwrap().char_to_swallow(), None);
+    }
 
     #[test]
     fn bare_program_stays_single_token() {

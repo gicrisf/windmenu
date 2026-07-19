@@ -60,6 +60,34 @@ impl FilterMode {
     }
 }
 
+/// A navigation keybinding: Ctrl/Shift modifiers plus a virtual-key code.
+/// Alt/Win are intentionally unsupported — those keydowns arrive as WM_SYSKEYDOWN,
+/// which the edit proc does not handle.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeyCombo {
+    pub ctrl: bool,
+    pub shift: bool,
+    pub vk: u16,
+}
+
+impl KeyCombo {
+    /// True if this combo is satisfied by the current key + modifier state.
+    fn matches(&self, vk: u16, ctrl: bool, shift: bool) -> bool {
+        self.vk == vk && self.ctrl == ctrl && self.shift == shift
+    }
+
+    /// The control character the EDIT control would insert for a Ctrl+<letter>
+    /// combo, so WM_CHAR can swallow it (Ctrl+A=1 .. Ctrl+Z=26; e.g. Ctrl+J=0x0A,
+    /// Ctrl+K=0x0B). None when this isn't a Ctrl+letter combo.
+    pub(crate) fn char_to_swallow(&self) -> Option<u32> {
+        if self.ctrl && (0x41..=0x5A).contains(&self.vk) {
+            Some((self.vk & 0x1F) as u32)
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub line_count: usize,
@@ -78,6 +106,8 @@ pub struct Settings {
     pub fg_edit: COLORREF,
     pub font_name: String,
     pub font_size: i32,
+    pub next: KeyCombo, // Move selection down (default Ctrl+J)
+    pub prev: KeyCombo, // Move selection up (default Ctrl+K)
 }
 
 impl Default for Settings {
@@ -99,6 +129,8 @@ impl Default for Settings {
             fg_edit: parse_color("#ffffff").unwrap(),
             font_name: "Courier New".to_string(),
             font_size: 24,
+            next: KeyCombo { ctrl: true, shift: false, vk: 0x4A }, // Ctrl+J
+            prev: KeyCombo { ctrl: true, shift: false, vk: 0x4B }, // Ctrl+K
         }
     }
 }
@@ -404,8 +436,14 @@ unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
                         call_orig_edit(state, wnd, EM_SETSEL as UINT, len, len as LPARAM);
                     }
                 }
-                // Swallow CR (handled in WM_KEYDOWN), Ctrl+J (LF), Ctrl+K (VT)
-                0x0A | 0x0B | 0x0D => return 0,
+                // Swallow CR (handled in WM_KEYDOWN) plus the control char of any
+                // Ctrl+<letter> navigation combo, so it isn't typed into the box.
+                0x0D => return 0,
+                c if Some(c as u32) == state.settings.next.char_to_swallow()
+                    || Some(c as u32) == state.settings.prev.char_to_swallow() =>
+                {
+                    return 0
+                }
                 _ => {
                     result = call_orig_edit(state, wnd, msg, wparam, lparam);
                 }
@@ -415,22 +453,24 @@ unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
         }
         WM_KEYDOWN => {
             let ctrl_pressed = GetKeyState(VK_CONTROL) & 0x8000u16 as i16 != 0;
+            let shift_pressed = GetKeyState(VK_SHIFT) & 0x8000u16 as i16 != 0;
+
+            // Configurable next/prev navigation combos take precedence over the
+            // hardcoded keys below (arrows/Home/End/PageUp/PageDown stay fixed).
+            let vk = wparam as u16;
+            if state.settings.next.matches(vk, ctrl_pressed, shift_pressed) {
+                move_selection(state, 1);
+                return 0;
+            }
+            if state.settings.prev.matches(vk, ctrl_pressed, shift_pressed) {
+                move_selection(state, -1);
+                return 0;
+            }
 
             match wparam as i32 {
-                0x4A if ctrl_pressed => {
-                    // Ctrl+J - Down
-                    move_selection(state, 1);
-                    return 1;
-                }
-                0x4B if ctrl_pressed => {
-                    // Ctrl+K - Up
-                    move_selection(state, -1);
-                    return 0;
-                }
                 VK_RETURN => {
                     // If no results or shift is held: return input, else: return selection
-                    let shift = GetKeyState(VK_SHIFT) & 0x8000u16 as i16 != 0;
-                    let result = if shift {
+                    let result = if shift_pressed {
                         get_edit_text(state)
                     } else {
                         match selected_entry_text(state) {
