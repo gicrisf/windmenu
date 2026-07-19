@@ -707,6 +707,13 @@ const EMBEDDED_PACKS: &[EmbeddedPack] = &[
         content: include_str!("../packs/tokyonight-theme.toml"),
     },
     EmbeddedPack {
+        name: "dracula",
+        kind: PackKind::Theme,
+        path: "packs/dracula-theme.toml",
+        description: "Dracula — dark purple-gray color scheme",
+        content: include_str!("../packs/dracula-theme.toml"),
+    },
+    EmbeddedPack {
         name: "power",
         kind: PackKind::Command,
         path: "packs/power-commands.toml",

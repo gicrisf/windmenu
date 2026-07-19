@@ -1,0 +1,18 @@
+# ===============================================================================
+# WindMenu Theme Pack — Dracula
+# ===============================================================================
+# Import from windmenu.toml with:
+#   import = ["packs/dracula-theme.toml"]
+# Then:
+#   theme = "dracula"
+#
+# Based on the dmenu patch by David Lima (hXtreme):
+#   https://draculatheme.com/dmenu
+
+[themes.dracula]
+bg        = "#282a36"   # background
+fg        = "#f8f8f2"   # foreground
+bg_select = "#6272a4"   # selection
+fg_select = "#f8f8f2"   # selection text
+bg_input  = "#44475a"   # current line
+fg_input  = "#f8f8f2"   # foreground
