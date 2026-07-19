@@ -309,7 +309,8 @@ struct MenuConfig {
     // Window geometry and font.
     horizontal: Option<bool>, // Single-row bar; entries flow left-to-right, `lines` is ignored
     lines: Option<usize>,   // Lines to show
-    width: Option<usize>,   // Window width (centers the window)
+    width: Option<usize>,   // Fixed window width in px (0 = full monitor width)
+    center: Option<bool>,   // Center the window on the monitor (default: true; false = top-left)
     padding: Option<usize>, // Window padding
     font: Option<String>,   // Font as "Family Size", e.g. "Consolas 18"
     prompt: Option<String>, // Text shown in the input box
@@ -475,7 +476,9 @@ fn resolve_settings(cfg: &MenuConfig) -> (wlines::Settings, Vec<String>) {
     }
     if let Some(width) = cfg.width {
         settings.width = width as i32;
-        settings.center_window = true;
+    }
+    if let Some(center) = cfg.center {
+        settings.center_window = center;
     }
     if let Some(padding) = cfg.padding {
         settings.padding = padding as i32;
@@ -1438,6 +1441,19 @@ mod tests {
         assert_eq!(settings.prompt.as_deref(), Some("Run:"));
         assert!(settings.case_sensitive);
         assert_eq!(cfg.hotkey, Some(vec!["ALT".to_string(), "F2".to_string()]));
+    }
+
+    #[test]
+    fn center_is_independent_of_width() {
+        // Centering defaults on and is its own key; setting `width` (even 0,
+        // full monitor width) no longer implies anything about position.
+        let (settings, _) = resolve_settings(&parse_config("width = 0"));
+        assert_eq!(settings.width, 0);
+        assert!(settings.center_window);
+
+        let (settings, _) = resolve_settings(&parse_config("width = 640\ncenter = false"));
+        assert_eq!(settings.width, 640);
+        assert!(!settings.center_window);
     }
 
     #[test]
