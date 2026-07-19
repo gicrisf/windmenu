@@ -45,36 +45,7 @@ pub trait Daemon {
 
     fn is_running(&self) -> bool;
 
-    fn start(&self) -> Result<(), DaemonError> {
-        if self.is_running() {
-            return Err(DaemonError::AlreadyRunning);
-        }
-
-        let mut cmd = Command::new(self.path());
-        cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-
-        if let Some(dir) = self.working_directory() {
-            cmd.current_dir(dir);
-        }
-
-        let child = cmd.spawn()
-            .map_err(|e| DaemonError::StartupFailed(
-                format!("Failed to start {} at '{}': {}",
-                        self.name(),
-                        self.path_str(), e)))?;
-
-        println!("{} started with PID: {} (path: {})",
-                 self.name(),
-                 child.id(),
-                 self.path_str());
-
-        // Give it a moment to initialize
-        thread::sleep(time::Duration::from_millis(500));
-        Ok(())
-    }
+    fn start(&self) -> Result<(), DaemonError>;
 
     fn stop(&self) -> Result<(), DaemonError>;
 

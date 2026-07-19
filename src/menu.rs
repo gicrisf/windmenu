@@ -620,7 +620,7 @@ fn init_target() -> Result<PathBuf, String> {
 }
 
 const RESTART_REMINDER: &str =
-    "Restart the daemon ('windmenu daemon restart') or run 'Reload Config' from the menu to apply changes.";
+    "Restart the daemon ('windmenu restart') or run 'Reload Config' from the menu to apply changes.";
 
 /// `config init`: write the embedded default config next to the executable.
 /// Refuses to overwrite an existing file unless `force` is set. Returns a

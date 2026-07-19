@@ -46,7 +46,7 @@ RequestExecutionLevel user
 
 ; Finish page
 !define MUI_FINISHPAGE_RUN "$INSTDIR\windmenu.exe"
-!define MUI_FINISHPAGE_RUN_PARAMETERS "daemon start"
+!define MUI_FINISHPAGE_RUN_PARAMETERS "start"
 !define MUI_FINISHPAGE_RUN_TEXT "Start Windmenu Daemon"
 !insertmacro MUI_PAGE_FINISH
 
@@ -101,7 +101,7 @@ SectionGroupEnd
 
 SectionGroup /e "Auto-start Options" SecGrpAutoStart
 Section /o "Registry Run (Basic)" SecAutoStartRegistry
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" '"$INSTDIR\windmenu.exe" daemon start'
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WindmenuDaemon" '"$INSTDIR\windmenu.exe" start'
 SectionEnd
 
 Section /o "Current User Startup Folder" SecAutoStartUser
@@ -157,7 +157,7 @@ Function .onInit
     
   close_processes:
     IfFileExists "$INSTDIR\windmenu.exe" 0 force_kill
-    nsExec::ExecToLog '"$INSTDIR\windmenu.exe" daemon stop'
+    nsExec::ExecToLog '"$INSTDIR\windmenu.exe" stop'
     Pop $0
   force_kill:
     nsExec::ExecToLog 'taskkill /F /IM windmenu.exe'

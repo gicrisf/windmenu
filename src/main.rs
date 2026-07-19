@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::env;
 use std::path::PathBuf;
 use std::thread;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 
 mod apps;
 mod daemon;
@@ -34,11 +34,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Daemon management commands
-    Daemon {
-        #[command(subcommand)]
-        action: DaemonAction,
-    },
+    /// Start the background daemon
+    Start,
+    /// Stop the background daemon
+    Stop,
+    /// Restart the background daemon
+    Restart,
+    /// Check whether the daemon is running
+    Status,
     /// Manage the windmenu.toml configuration
     Config {
         #[command(subcommand)]
@@ -94,18 +97,6 @@ enum PackAction {
         /// Pack name (see `config pack list`)
         name: String,
     },
-}
-
-#[derive(Subcommand)]
-enum DaemonAction {
-    /// Start the daemon
-    Start,
-    /// Stop the daemon
-    Stop,
-    /// Restart the daemon
-    Restart,
-    /// Check daemon status
-    Status,
 }
 
 #[derive(Subcommand)]
@@ -269,86 +260,75 @@ fn main() {
     }
 
     match cli.command {
-        Some(Commands::Daemon { action }) => {
-            handle_daemon_action(action, &windmenu_daemon);
-        }
+        Some(Commands::Start) => start_daemon(&windmenu_daemon),
+        Some(Commands::Stop) => stop_daemon(&windmenu_daemon),
+        Some(Commands::Restart) => restart_daemon(&windmenu_daemon),
+        Some(Commands::Status) => status_daemon(&windmenu_daemon),
         Some(Commands::Config { action }) => {
             handle_config_command(action);
         }
         Some(Commands::Test { test_type }) => {
             handle_test_command(test_type);
         }
+        // No subcommand: show help rather than doing anything implicitly.
         None => {
-            // Default behavior - start windmenu daemon
-            match windmenu_daemon.start() {
-                Ok(()) => {
-                    println!("windmenu is now running in the background");
-                    println!("Press Ctrl+Alt+Space to activate menu");
-                    println!("Use 'windmenu daemon stop' to stop the daemon");
-                }
-                Err(DaemonError::AlreadyRunning) => {
-                    println!("windmenu daemon is already running");
-                }
-                Err(err) => {
-                    eprintln!("Failed to start windmenu daemon: {}", err);
-                    cli_exit(1);
-                }
-            }
+            let _ = Cli::command().print_help();
+            println!();
+            cli_exit(0);
         }
     }
 
     release_parent_console();
 }
 
-fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
-    match action {
-        DaemonAction::Start => {
-            match daemon.start() {
-                Ok(()) => {
-                    println!("windmenu is now running in the background");
-                    println!("Press Ctrl+Alt+Space to activate menu");
-                    println!("Use 'windmenu daemon stop' to stop the daemon");
-                }
-                Err(DaemonError::AlreadyRunning) => {
-                    println!("windmenu daemon is already running");
-                }
-                Err(err) => {
-                    eprintln!("Failed to start windmenu daemon: {}", err);
-                    cli_exit(1);
-                }
-            }
+fn start_daemon<T: Daemon>(daemon: &T) {
+    match daemon.start() {
+        Ok(()) => {
+            println!("windmenu is now running in the background");
+            println!("Press Ctrl+Alt+Space to activate menu");
+            println!("Use 'windmenu stop' to stop the daemon");
         }
-        DaemonAction::Stop => {
-            match daemon.stop() {
-                Ok(()) => {
-                    println!("windmenu daemon stopped successfully");
-                }
-                Err(DaemonError::NotRunning) => {
-                    println!("No windmenu daemon was running");
-                }
-                Err(err) => {
-                    eprintln!("Failed to stop windmenu daemon: {}", err);
-                }
-            }
+        Err(DaemonError::AlreadyRunning) => {
+            println!("windmenu daemon is already running");
         }
-        DaemonAction::Restart => {
-            match daemon.restart() {
-                Ok(()) => {
-                    println!("windmenu daemon restarted successfully");
-                    println!("Press Ctrl+Alt+Space to activate menu");
-                }
-                Err(err) => {
-                    eprintln!("Failed to restart windmenu daemon: {}", err);
-                    cli_exit(1);
-                }
-            }
-        }
-        DaemonAction::Status => {
-            let status = daemon.get_status();
-            println!("windmenu daemon status:");
-            print!("{}", status);
+        Err(err) => {
+            eprintln!("Failed to start windmenu daemon: {}", err);
+            cli_exit(1);
         }
     }
+}
+
+fn stop_daemon<T: Daemon>(daemon: &T) {
+    match daemon.stop() {
+        Ok(()) => {
+            println!("windmenu daemon stopped successfully");
+        }
+        Err(DaemonError::NotRunning) => {
+            println!("No windmenu daemon was running");
+        }
+        Err(err) => {
+            eprintln!("Failed to stop windmenu daemon: {}", err);
+        }
+    }
+}
+
+fn restart_daemon<T: Daemon>(daemon: &T) {
+    match daemon.restart() {
+        Ok(()) => {
+            println!("windmenu daemon restarted successfully");
+            println!("Press Ctrl+Alt+Space to activate menu");
+        }
+        Err(err) => {
+            eprintln!("Failed to restart windmenu daemon: {}", err);
+            cli_exit(1);
+        }
+    }
+}
+
+fn status_daemon<T: Daemon>(daemon: &T) {
+    let status = daemon.get_status();
+    println!("windmenu daemon status:");
+    print!("{}", status);
 }
 
 fn handle_config_command(action: ConfigAction) {

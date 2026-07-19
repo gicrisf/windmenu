@@ -79,16 +79,32 @@ if ($alreadyInPath) {
     }
 }
 
+# Ask user about auto-start on login (a plain Startup-folder shortcut)
+Write-Host ""
+$addStartup = Read-Host "Start windmenu automatically when you log in? (Y/n)"
+if ($addStartup -eq '' -or $addStartup -match '^[Yy]') {
+    $lnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk'
+    $ws = New-Object -ComObject WScript.Shell
+    $s = $ws.CreateShortcut($lnk)
+    $s.TargetPath = $windmenuExe
+    $s.Arguments = 'start'
+    $s.WorkingDirectory = $InstallDir
+    $s.Save()
+    Write-Host "Auto-start enabled (Startup folder shortcut)." -ForegroundColor Green
+    Write-Host "  Remove it later with: Remove-Item '$lnk'" -ForegroundColor White
+} else {
+    Write-Host "Skipped auto-start." -ForegroundColor Yellow
+}
+
 # Done
 Write-Host ""
 Write-Host "windmenu $tag installed to $InstallDir" -ForegroundColor Green
 Write-Host ""
 Write-Host "To get started, run:" -ForegroundColor Cyan
-Write-Host "  windmenu daemon start" -ForegroundColor White
+Write-Host "  windmenu start" -ForegroundColor White
 Write-Host ""
 Write-Host "Then press Ctrl+Alt+Space to launch the menu." -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Optional:" -ForegroundColor Cyan
-Write-Host "  windmenu daemon enable user-folder # auto-start on login" -ForegroundColor White
 Write-Host "  notepad $InstallDir\windmenu.toml  # customize hotkey and commands" -ForegroundColor White
 Write-Host ""

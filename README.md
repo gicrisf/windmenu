@@ -35,7 +35,7 @@ scoop install windmenu
 
 ### Option 3: Direct Download
 
-Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe daemon start`.
+Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe start`.
 
 Press `Ctrl+Alt+Space` to launch.
 
@@ -50,7 +50,7 @@ cargo install --git https://github.com/gicrisf/windmenu
 > direct download for the latest published release. Cargo compiles windmenu from
 > source on your Windows host, so a Rust toolchain is required. `cargo uninstall
 > windmenu` removes the binary but does not stop a running daemon nor clean up
-> any auto-start shortcut you created — run `windmenu daemon stop` and remove the
+> any auto-start shortcut you created — run `windmenu stop` and remove the
 > Startup-folder shortcut (see below) before uninstalling.
 
 Press `Ctrl+Alt+Space` to launch.
@@ -66,7 +66,7 @@ Scoop package and the NSIS installer set this up for you; do it manually with:
 $lnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk'
 $s = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
 $s.TargetPath = (Get-Command windmenu).Source
-$s.Arguments  = 'daemon start'
+$s.Arguments  = 'start'
 $s.Save()
 
 # Disable
@@ -282,14 +282,14 @@ otherwise the system will try to launch something that no longer exists at the
 next startup:
 
 ```powershell
-windmenu daemon stop
+windmenu stop
 Remove-Item (Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk') -ErrorAction SilentlyContinue
 ```
 
 Check whether the daemon is still running with
 
 ``` powershell
-windmenu daemon status
+windmenu status
 ```
 
 If no instance is running, proceed by removing the binaries. If installed via Scoop (which also removes the Startup shortcut automatically):
