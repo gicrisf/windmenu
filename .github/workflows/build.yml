@@ -27,7 +27,7 @@ jobs:
     - name: Install build dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-mingw-w64-x86-64 nsis zip
+        sudo apt-get install -y gcc-mingw-w64-x86-64 zip
 
     - name: Cache cargo dependencies
       uses: actions/cache@v4
@@ -38,37 +38,31 @@ jobs:
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     
-    - name: Make build script executable
-      run: chmod +x build-installer.sh
-    
-    - name: Run build installer script
-      run: ./build-installer.sh
+    - name: Build windmenu.exe
+      run: |
+        RUSTFLAGS="-C target-feature=+crt-static" \
+          cargo build --release --target x86_64-pc-windows-gnu
 
     - name: Verify build outputs
       run: |
-        if [ ! -f "windmenu-installer.exe" ]; then
-          echo "ERROR: windmenu-installer.exe was not created!"
-          exit 1
-        fi
-        
         if [ ! -f "target/x86_64-pc-windows-gnu/release/windmenu.exe" ]; then
           echo "ERROR: windmenu.exe was not built!"
           exit 1
         fi
-        
-        
-        echo "✓ All build outputs verified"
-    
-    - name: Create portable ZIP archive
+        echo "✓ Build output verified"
+
+    - name: Create ZIP archive
       run: |
-        mkdir -p release-portable
-        cp target/x86_64-pc-windows-gnu/release/windmenu.exe release-portable/
-        cp windmenu.toml release-portable/
-        cp README.md release-portable/
-        cp LICENSE release-portable/
-        
-        cd release-portable
-        zip -r ../windmenu-portable.zip .
+        mkdir -p release-zip
+        cp target/x86_64-pc-windows-gnu/release/windmenu.exe release-zip/
+        cp autostart/autostart.ps1 release-zip/
+        cp autostart/README.md release-zip/AUTOSTART.md
+        cp windmenu.toml release-zip/
+        cp README.md release-zip/
+        cp LICENSE release-zip/
+
+        cd release-zip
+        zip -r ../windmenu.zip .
         cd ..
     
     - name: Upload build artifacts
@@ -76,8 +70,7 @@ jobs:
       with:
         name: windmenu-build-${{ github.sha }}
         path: |
-          windmenu-installer.exe
-          windmenu-portable.zip
+          windmenu.zip
         retention-days: 30
 
   release:
@@ -120,6 +113,5 @@ jobs:
         draft: false
         prerelease: ${{ contains(steps.tag_info.outputs.tag, '-') }}
         files: |
-          windmenu-installer.exe
-          windmenu-portable.zip
+          windmenu.zip
         token: ${{ secrets.GITHUB_TOKEN }}

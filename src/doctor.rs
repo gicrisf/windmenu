@@ -12,8 +12,8 @@ use std::path::PathBuf;
 use crate::daemon::WindmenuDaemon;
 use crate::menu;
 
-/// Registry Run value that the NSIS installer's "Registry Run (Basic)" method
-/// writes (`installer.nsi`). Probed read-only.
+/// Registry Run value written by `autostart.ps1 enable -Method Registry`
+/// (`autostart/autostart.ps1`). Probed read-only.
 const RUN_VALUE_NAME: &str = "WindmenuDaemon";
 const RUN_SUBKEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 
@@ -61,8 +61,8 @@ pub fn run(daemon: &WindmenuDaemon) {
 }
 
 /// `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\windmenu.lnk` —
-/// the shortcut written by the Scoop manifest and the installer's Startup-folder
-/// method.
+/// the shortcut written by the Scoop manifest and `autostart.ps1 enable`
+/// (default Startup method).
 fn startup_shortcut_path() -> Option<PathBuf> {
     env::var("APPDATA").ok().map(|appdata| {
         PathBuf::from(appdata)

@@ -7,7 +7,8 @@
 ## Auto-start moved out of the app (0.7.0)
 
 - windmenu no longer manages auto-start itself: the `windmenu daemon enable/disable` commands and the built-in Registry/Startup-folder logic (and the `mslnk` dependency) have been removed. `windmenu doctor` reports the daemon running state and the auto-start method in effect
-- Auto-start is now a plain Startup-folder shortcut (or registry Run-key entry) you create once. The NSIS installer and the Scoop/PowerShell installers set it up for you; the README documents the two-line PowerShell to enable/disable it manually
+- Auto-start is now a plain Startup-folder shortcut (or registry Run-key entry) you create once. The Scoop and PowerShell installers set it up for you; otherwise the bundled `autostart.ps1` helper (enable/disable/status) does it, and `AUTOSTART.md` documents the by-hand PowerShell
+- The NSIS installer has been dropped — releases ship a single `windmenu.zip` (windmenu.exe + autostart.ps1 + config)
 
 ## Horizontal bar mode (0.7.0)
 

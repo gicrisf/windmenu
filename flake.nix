@@ -34,7 +34,6 @@
           packages = [
             rustToolchain
             mingwCC        # provides x86_64-w64-mingw32-gcc (the linker in .cargo/config.toml)
-            pkgs.nsis      # for ./build-installer.sh
           ];
 
           # Default every cargo invocation to the cross target, so plain

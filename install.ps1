@@ -24,15 +24,15 @@ Write-Host "Latest version: $tag" -ForegroundColor Green
 Write-Host "Install directory: $InstallDir" -ForegroundColor Green
 Write-Host ""
 
-# Download portable zip to temp
-$zipUrl = "https://github.com/gicrisf/windmenu/releases/download/$tag/windmenu-portable.zip"
-$tempZip = Join-Path $env:TEMP "windmenu-portable.zip"
+# Download zip to temp
+$zipUrl = "https://github.com/gicrisf/windmenu/releases/download/$tag/windmenu.zip"
+$tempZip = Join-Path $env:TEMP "windmenu.zip"
 
 Write-Host "Downloading $zipUrl ..." -ForegroundColor Yellow
 try {
     Invoke-WebRequest -Uri $zipUrl -OutFile $tempZip -UseBasicParsing
 } catch {
-    Write-Host "Error: Failed to download windmenu-portable.zip" -ForegroundColor Red
+    Write-Host "Error: Failed to download windmenu.zip" -ForegroundColor Red
     Write-Host $_.Exception.Message -ForegroundColor Red
     exit 1
 }
@@ -79,21 +79,16 @@ if ($alreadyInPath) {
     }
 }
 
-# Ask user about auto-start on login (a plain Startup-folder shortcut)
+# Ask user about auto-start on login (delegates to autostart.ps1 in the package)
+$autostart = Join-Path $InstallDir "autostart.ps1"
 Write-Host ""
 $addStartup = Read-Host "Start windmenu automatically when you log in? (Y/n)"
 if ($addStartup -eq '' -or $addStartup -match '^[Yy]') {
-    $lnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk'
-    $ws = New-Object -ComObject WScript.Shell
-    $s = $ws.CreateShortcut($lnk)
-    $s.TargetPath = $windmenuExe
-    $s.Arguments = 'start'
-    $s.WorkingDirectory = $InstallDir
-    $s.Save()
-    Write-Host "Auto-start enabled (Startup folder shortcut)." -ForegroundColor Green
-    Write-Host "  Remove it later with: Remove-Item '$lnk'" -ForegroundColor White
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $autostart enable -ExePath $windmenuExe
+    Write-Host "  Disable later with: powershell -NoProfile -ExecutionPolicy Bypass -File `"$autostart`" disable" -ForegroundColor White
 } else {
-    Write-Host "Skipped auto-start." -ForegroundColor Yellow
+    Write-Host "Skipped auto-start. Enable later with:" -ForegroundColor Yellow
+    Write-Host "  powershell -NoProfile -ExecutionPolicy Bypass -File `"$autostart`" enable" -ForegroundColor White
 }
 
 # Done

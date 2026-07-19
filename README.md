@@ -35,7 +35,7 @@ scoop install windmenu
 
 ### Option 3: Direct Download
 
-Download `windmenu-portable.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe start`.
+Download `windmenu.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe start`.
 
 Press `Ctrl+Alt+Space` to launch.
 
@@ -58,25 +58,12 @@ Press `Ctrl+Alt+Space` to launch.
 ### Auto-Startup
 
 windmenu no longer manages auto-start itself — it is a plain Startup-folder
-shortcut or registry Run-key entry that you create once with PowerShell. The
-Scoop package and the NSIS installer set this up for you; do it manually with:
+shortcut (or registry Run-key entry) that you create once. The Scoop package and
+the PowerShell installer set this up for you; for any other install (including
+`cargo install`) you enable it by hand.
 
-```powershell
-# Enable — Startup folder shortcut (no admin required)
-$lnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk'
-$s = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
-$s.TargetPath = (Get-Command windmenu).Source
-$s.Arguments  = 'start'
-$s.Save()
-
-# Disable
-Remove-Item (Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk')
-```
-
-Prefer the registry Run key instead? `Set-ItemProperty` /
-`Remove-ItemProperty` on
-`HKCU:\Software\Microsoft\Windows\CurrentVersion\Run` under the name
-`WindmenuDaemon` works the same way.
+See [`autostart/README.md`](autostart/README.md) (shipped as `AUTOSTART.md` in
+`windmenu.zip`) for the copy-paste commands and the `autostart.ps1` helper.
 
 ## Configuration
 
