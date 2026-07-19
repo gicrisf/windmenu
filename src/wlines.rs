@@ -173,6 +173,7 @@ struct State {
     had_foreground: bool,
     prompt_width: i32,
     prompt_wide: Option<Vec<u16>>,
+    marker_width: i32, // "<"/">" page-marker slot (horizontal mode, else 0)
 
     entries: Vec<Entry>,
     search_results: Vec<usize>, // indices into `entries`
@@ -227,9 +228,10 @@ impl State {
         }
     }
 
-    /// X where the entry cells start (horizontal mode): right of the input box.
+    /// X where the entry cells start (horizontal mode): right of the input box
+    /// and the "<" page-marker slot.
     fn entries_left(&self) -> i32 {
-        self.settings.padding + self.prompt_width + self.input_width()
+        self.settings.padding + self.prompt_width + self.input_width() + self.marker_width
     }
 
     /// Width of entry cell `idx` (into `search_results`): its text plus the
@@ -248,7 +250,8 @@ impl State {
         }
         if self.settings.horizontal {
             let widths: Vec<i32> = (0..count).map(|i| self.cell_width(i)).collect();
-            let avail = self.width - self.settings.padding - self.entries_left();
+            // The ">" marker slot on the right mirrors the "<" inside entries_left
+            let avail = self.width - self.settings.padding - self.marker_width - self.entries_left();
             pack_pages(&widths, avail)
         } else {
             if self.line_count == 0 {
@@ -749,6 +752,29 @@ unsafe extern "system" fn main_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
                 }
             }
 
+            // Page markers (horizontal): "<"/">" in the reserved slots flanking
+            // the entries, drawn only when more pages exist on that side
+            if state.settings.horizontal {
+                let visible = state.visible_range();
+                SetTextColor(hdc, state.settings.fg);
+                let draw_marker = |text: &str, left: i32| {
+                    let wide = to_wide(text);
+                    let mut rect = RECT {
+                        left: left + hmargin,
+                        top: padding,
+                        right: left + state.marker_width - hmargin,
+                        bottom: padding + font_size,
+                    };
+                    DrawTextW(hdc, wide.as_ptr(), -1, &mut rect, DRAWTEXT_PARAMS);
+                };
+                if visible.start > 0 {
+                    draw_marker("<", state.entries_left() - state.marker_width);
+                }
+                if visible.end < state.search_results.len() {
+                    draw_marker(">", state.width - padding - state.marker_width);
+                }
+            }
+
             // Blit
             BitBlt(real_hdc, 0, 0, state.width, state.height, hdc, 0, 0, SRCCOPY);
 
@@ -861,6 +887,17 @@ unsafe fn create_window(state: &mut State) -> Result<(), String> {
                         DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
                 entry.width = rect.right - rect.left;
             }
+            // Fixed slots flanking the entries for the "<"/">" page markers,
+            // reserved on both sides regardless of page so cells don't shift
+            let mut marker = 0;
+            for text in ["<", ">"] {
+                let wide = to_wide(text);
+                let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                DrawTextW(tmp_hdc, wide.as_ptr(), -1, &mut rect,
+                        DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
+                marker = marker.max(rect.right - rect.left);
+            }
+            state.marker_width = marker + state.font_hmargin() * 2;
         }
         DeleteDC(tmp_hdc);
     }
@@ -981,6 +1018,7 @@ unsafe fn show_inner(settings: &Settings, entries: &[String]) -> Option<String> 
         line_count,
         had_foreground: false,
         prompt_width: 0,
+        marker_width: 0,
         entries,
         search_results,
         selected,
