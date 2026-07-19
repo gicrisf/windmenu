@@ -29,47 +29,6 @@ impl fmt::Display for DaemonError {
     }
 }
 
-pub trait Daemon {
-    fn name(&self) -> &'static str;
-    fn path(&self) -> &Path;
-
-    fn path_str(&self) -> String {
-        self.path().to_string_lossy().to_string()
-    }
-
-    fn working_directory(&self) -> Option<PathBuf> {
-        self.path()
-            .parent()
-            .map(|p| p.to_path_buf())
-    }
-
-    fn is_running(&self) -> bool;
-
-    fn start(&self) -> Result<(), DaemonError>;
-
-    fn stop(&self) -> Result<(), DaemonError>;
-
-    fn restart(&self) -> Result<(), DaemonError> {
-        match self.stop() {
-            Ok(()) => {},
-            Err(DaemonError::NotRunning) => {},
-            Err(e) => return Err(e),
-        }
-
-        // Wait a moment for cleanup
-        thread::sleep(time::Duration::from_millis(1000));
-
-        // Start the daemon
-        self.start()
-    }
-
-    fn get_status(&self) -> DaemonStatus {
-        DaemonStatus {
-            is_running: self.is_running(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct WindmenuDaemon {
     pub path: PathBuf,
@@ -79,18 +38,20 @@ impl WindmenuDaemon {
     pub fn new<P: AsRef<Path>>(path: P) -> Self {
         Self { path: path.as_ref().to_path_buf() }
     }
-}
-
-impl Daemon for WindmenuDaemon {
-    fn path(&self) -> &Path {
-        &self.path
-    }
 
     fn name(&self) -> &'static str {
         "windmenu"
     }
 
-    fn is_running(&self) -> bool {
+    fn path_str(&self) -> String {
+        self.path.to_string_lossy().to_string()
+    }
+
+    fn working_directory(&self) -> Option<PathBuf> {
+        self.path.parent().map(|p| p.to_path_buf())
+    }
+
+    pub fn is_running(&self) -> bool {
         let name: Vec<u16> = "windmenu-daemon-mutex\0".encode_utf16().collect();
         unsafe {
             let h = OpenMutexW(SYNCHRONIZE, 0, name.as_ptr());
@@ -103,7 +64,7 @@ impl Daemon for WindmenuDaemon {
         }
     }
 
-    fn start(&self) -> Result<(), DaemonError> {
+    pub fn start(&self) -> Result<(), DaemonError> {
         if self.is_running() {
             return Err(DaemonError::AlreadyRunning);
         }
@@ -139,7 +100,7 @@ impl Daemon for WindmenuDaemon {
         Ok(())
     }
 
-    fn stop(&self) -> Result<(), DaemonError> {
+    pub fn stop(&self) -> Result<(), DaemonError> {
         if !self.is_running() {
             return Err(DaemonError::NotRunning);
         }
@@ -168,6 +129,26 @@ impl Daemon for WindmenuDaemon {
         Err(DaemonError::ShutdownFailed(
             "Daemon did not shut down within timeout".to_string()
         ))
+    }
+
+    pub fn restart(&self) -> Result<(), DaemonError> {
+        match self.stop() {
+            Ok(()) => {},
+            Err(DaemonError::NotRunning) => {},
+            Err(e) => return Err(e),
+        }
+
+        // Wait a moment for cleanup
+        thread::sleep(time::Duration::from_millis(1000));
+
+        // Start the daemon
+        self.start()
+    }
+
+    pub fn get_status(&self) -> DaemonStatus {
+        DaemonStatus {
+            is_running: self.is_running(),
+        }
     }
 }
 

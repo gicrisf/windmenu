@@ -15,7 +15,7 @@ mod menu;
 mod theme;
 mod wlines;
 
-use daemon::{Daemon, DaemonError, WindmenuDaemon};
+use daemon::{DaemonError, WindmenuDaemon};
 use apps::print_reparse_points_info;
 use menu::Menu;
 
@@ -281,7 +281,7 @@ fn main() {
     release_parent_console();
 }
 
-fn start_daemon<T: Daemon>(daemon: &T) {
+fn start_daemon(daemon: &WindmenuDaemon) {
     match daemon.start() {
         Ok(()) => {
             println!("windmenu is now running in the background");
@@ -298,7 +298,7 @@ fn start_daemon<T: Daemon>(daemon: &T) {
     }
 }
 
-fn stop_daemon<T: Daemon>(daemon: &T) {
+fn stop_daemon(daemon: &WindmenuDaemon) {
     match daemon.stop() {
         Ok(()) => {
             println!("windmenu daemon stopped successfully");
@@ -312,7 +312,7 @@ fn stop_daemon<T: Daemon>(daemon: &T) {
     }
 }
 
-fn restart_daemon<T: Daemon>(daemon: &T) {
+fn restart_daemon(daemon: &WindmenuDaemon) {
     match daemon.restart() {
         Ok(()) => {
             println!("windmenu daemon restarted successfully");
@@ -325,7 +325,7 @@ fn restart_daemon<T: Daemon>(daemon: &T) {
     }
 }
 
-fn status_daemon<T: Daemon>(daemon: &T) {
+fn status_daemon(daemon: &WindmenuDaemon) {
     let status = daemon.get_status();
     println!("windmenu daemon status:");
     print!("{}", status);
