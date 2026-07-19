@@ -12,6 +12,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 mod apps;
 mod daemon;
 mod doctor;
+mod history;
 mod menu;
 mod theme;
 mod wlines;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -29,6 +29,7 @@ use winapi::um::handleapi::CloseHandle;
 use winapi::um::synchapi::CreateEventW;
 
 use crate::apps::{find_reparse_points, get_windows_apps_path};
+use crate::history::{History, HISTORY_FILE};
 use crate::theme::{self, Palette};
 use crate::wlines;
 
@@ -305,6 +306,7 @@ struct MenuConfig {
     // Search behavior (rofi's -matching / -case-sensitive).
     matching: Option<String>,     // "complete" / "keywords" / "fuzzy"
     case_sensitive: Option<bool>, // Match case exactly (default: false)
+    history: Option<bool>,        // Order entries by selection frequency (default: true)
 
     // Window geometry and font.
     horizontal: Option<bool>, // Single-row bar; entries flow left-to-right, `lines` is ignored
@@ -935,6 +937,8 @@ pub struct Menu {
     pub entries: Arc<RwLock<EntryStore>>,
     pub settings: wlines::Settings,
     pub hotkey: Hotkey,
+    // None when disabled via `history = false` in the config
+    history: Option<Mutex<History>>,
 }
 
 fn get_start_menu_paths() -> Vec<PathBuf> {
@@ -981,8 +985,10 @@ impl Menu {
         };
         let mut settings = theme::default_settings();
         let entries = Arc::new(RwLock::new(EntryStore::empty()));
+        let mut history_enabled = true;
+        let mut history_dir: Option<PathBuf> = None;
 
-        if let Ok((cfg, _config_dir, import_warnings)) = load_with_imports() {
+        if let Ok((cfg, config_dir, import_warnings)) = load_with_imports() {
             let (resolved, warnings) = resolve_settings(&cfg);
             settings = resolved;
             for warning in import_warnings.iter().chain(warnings.iter()) {
@@ -994,13 +1000,26 @@ impl Menu {
             if let Some(cmds) = cfg.commands {
                 entries.write().unwrap().apply_config_commands(cmds);
             }
+            history_enabled = cfg.history.unwrap_or(true);
+            history_dir = Some(config_dir);
         }
+
+        // The history file lives next to the config; with no config it sits
+        // next to the executable, mirroring where `config init` would write.
+        let history = history_enabled.then(|| {
+            let dir = history_dir.or_else(|| {
+                env::current_exe().ok().and_then(|p| p.parent().map(Path::to_path_buf))
+            });
+            let path = dir.unwrap_or_else(|| PathBuf::from(".")).join(HISTORY_FILE);
+            Mutex::new(History::load(path))
+        });
 
         Menu {
             process_running,
             entries,
             settings,
             hotkey,
+            history,
         }
     }
 
@@ -1030,13 +1049,23 @@ impl Menu {
     }
 
     fn prepare_entries(&self) -> Vec<String> {
-        self.entries.read().unwrap().all_entries()
+        let mut entries = self.entries.read().unwrap().all_entries();
+        if let Some(history) = &self.history {
+            history.lock().unwrap().sort_entries(&mut entries);
+        }
+        entries
     }
 
     fn execute_command(&self, selected: &str) -> Result<(), MenuError> {
         let cmd = {
             self.entries.read().unwrap().get(selected).cloned()
         };
+
+        if cmd.is_some() {
+            if let Some(history) = &self.history {
+                history.lock().unwrap().record(selected);
+            }
+        }
 
         match cmd {
             Some(MenuCommand::Start(path)) => {

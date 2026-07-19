@@ -15,6 +15,7 @@ hotkey = ["CTRL", "ALT", "SPACE"]
 #   "fuzzy"    - fzf-style subsequence scoring, results sorted by score (default)
 matching = "fuzzy"
 case_sensitive = false                # Match case exactly (default: false)
+# history = false                     # Disable most-used-first ordering (default: true)
 
 # --- Navigation ---
 # Keys that move the selection while the menu is open (CTRL/SHIFT + one key).
