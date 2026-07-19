@@ -1,21 +1,55 @@
 # ===============================================================================
 # WindMenu Theme Pack — Hatsune Miku
 # ===============================================================================
-# Install with:
-#   windmenu config pack install hatsunemiku
 # Import from windmenu.toml with:
 #   import = ["packs/hatsunemiku-theme.toml"]
-# Then select the scheme:
-#   theme = "hatsunemiku"
+# Then select a scheme:
+#   theme = "hatsunemiku-cyan"
 
-[themes.hatsunemiku]
-bg        = "#242829"   # dark gray
-fg        = "#dcd7d7"   # light gray
-bg_select = "#7cc7d6"   # iconic Miku cyan
-fg_select = "#242829"   # dark on light
-bg_input  = "#333738"   # slightly lighter base
-fg_input  = "#dcd7d7"   # light gray
+[themes.hatsunemiku-cyan]
+bg        = "#242829"
+fg        = "#dcd7d7"
+bg_select = "#7cc7d6"
+fg_select = "#242829"
+bg_input  = "#333738"
+fg_input  = "#dcd7d7"
 
-# Alternative accent colors for bg_select:
-# - Cyan:    #7cc7d6 (current)   - Magenta: #bc7fd2   - Pink:  #df2683
-# - Blue:    #1a86b9             - Green:   #13868c   - Cream: #fcfcdf
+[themes.hatsunemiku-magenta]
+bg        = "#242829"
+fg        = "#dcd7d7"
+bg_select = "#bc7fd2"
+fg_select = "#242829"
+bg_input  = "#333738"
+fg_input  = "#dcd7d7"
+
+[themes.hatsunemiku-pink]
+bg        = "#242829"
+fg        = "#dcd7d7"
+bg_select = "#df2683"
+fg_select = "#242829"
+bg_input  = "#333738"
+fg_input  = "#dcd7d7"
+
+[themes.hatsunemiku-blue]
+bg        = "#242829"
+fg        = "#dcd7d7"
+bg_select = "#1a86b9"
+fg_select = "#242829"
+bg_input  = "#333738"
+fg_input  = "#dcd7d7"
+
+[themes.hatsunemiku-green]
+bg        = "#242829"
+fg        = "#dcd7d7"
+bg_select = "#13868c"
+fg_select = "#242829"
+bg_input  = "#333738"
+fg_input  = "#dcd7d7"
+
+[themes.hatsunemiku-cream]
+bg        = "#242829"
+fg        = "#dcd7d7"
+bg_select = "#fcfcdf"
+fg_select = "#242829"
+bg_input  = "#333738"
+fg_input  = "#dcd7d7"

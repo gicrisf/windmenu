@@ -1,7 +1,7 @@
 # ===============================================================================
 # WindMenu Command Pack — Power
 # ===============================================================================
-# Shutdown / restart / session commands. Import from windmenu.toml with:
+# Import from windmenu.toml with:
 #   import = ["packs/power-commands.toml"]
 
 [[commands]]

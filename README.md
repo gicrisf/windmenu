@@ -44,11 +44,13 @@ Press `Ctrl+Alt+Space` to launch.
 cargo install --git https://github.com/gicrisf/windmenu
 ```
 
-> **Note**: Cargo compiles windmenu from source on your Windows host, so a Rust
-> toolchain is required. The precompiled binary from a [release](https://github.com/gicrisf/windmenu/releases/latest)
-> is usually the simpler option. `cargo uninstall windmenu` removes the binary
-> but does not stop a running daemon nor clean up auto-start entries — run
-> `windmenu daemon stop` followed by `windmenu daemon disable` before uninstalling.
+> **Note**: This installs the current development version from the `main` branch
+> — it may include unreleased changes. Use the PowerShell script, Scoop, or
+> direct download for the latest published release. Cargo compiles windmenu from
+> source on your Windows host, so a Rust toolchain is required. `cargo uninstall
+> windmenu` removes the binary but does not stop a running daemon nor clean up
+> auto-start entries — run `windmenu daemon stop` followed by
+> `windmenu daemon disable` before uninstalling.
 
 Press `Ctrl+Alt+Space` to launch.
 
@@ -231,37 +233,13 @@ keys = ["WIN", "CTRL", "1"]
 
 The menu will display both types of commands and execute them appropriately based on their configuration.
 
-## Config packs (import)
+## Config packs
 
-Large sets of themes or commands can live in separate files and be pulled in with `import` (paths are relative to your `windmenu.toml`):
+Themes and commands can live in standalone pack files. See [`packs/README.md`](packs/README.md) for details.
 
 ```toml
 import = ["packs/catppuccin-theme.toml", "packs/power-commands.toml"]
 ```
-
-An imported pack is an ordinary config file that contains only `[themes.*]` tables and/or `[[commands]]` entries — any other keys are ignored. Importing is **non-recursive**: a pack cannot import further packs. A missing or malformed pack is not fatal — windmenu warns and skips it (the warning shows up under `windmenu config path`) rather than failing to start.
-
-Merge order is predictable: your `windmenu.toml` always wins over imports, and among imports the last one listed wins. So a `[themes.nord]` or a command named `Shutdown` in your main file overrides one of the same name from a pack.
-
-Packs live in a single `packs/` directory. The filename is up to you, but the convention is a suffix naming the config section the pack contributes — `-theme` or `-commands` — so an `import` list reads at a glance (`packs/gruvbox-theme.toml`, `packs/emacs-commands.toml`). It's advisory only: windmenu never parses the filename, and a single file may carry both themes and commands. Keybindings are a kind of command, so describe them in the *name* (`packs/wt-keys-commands.toml`), not with a new suffix.
-
-Windmenu bundles a few ready-made packs. List them, then install one next to your config:
-
-```bash
-windmenu config pack list                # what's available (--themes / --commands to filter)
-windmenu config pack install catppuccin  # writes packs/catppuccin-theme.toml + prints the import line
-windmenu config pack show catppuccin     # preview without installing
-```
-
-Bundled packs:
-
-- `catppuccin` — Catppuccin Frappé and Mocha themes
-- `dmenu`, `hatsunemiku` — more themes
-- `power` — shutdown / restart / log off / hibernate / lock
-- `windows-tools` — Device Manager, Services, Event Viewer, and other consoles
-- `wt-keys` — Windows Terminal tab / pane / font shortcuts
-
-`config pack install` writes the file and prints the `import` line to paste — it never edits your config for you. A single theme pack can define several schemes at once: after installing `catppuccin`, both `theme = "catppuccin-frappe"` and `theme = "catppuccin-mocha"` are available.
 
 ## Build
 

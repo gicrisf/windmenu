@@ -1,7 +1,8 @@
 # ===============================================================================
 # WindMenu Command Pack — Windows Tools
 # ===============================================================================
-# Common admin consoles and utilities. Import from windmenu.toml with:
+# Common admin consoles and utilities.
+# Import from windmenu.toml with:
 #   import = ["packs/windows-tools-commands.toml"]
 #
 # Note: .msc consoles are launched through their host, mmc.exe — windmenu runs

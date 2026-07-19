@@ -2,8 +2,6 @@
 # WindMenu Command Pack — Windows Terminal
 # ===============================================================================
 # Key combination commands for Windows Terminal management.
-# Install with:
-#   windmenu config pack install wt-keys
 # Import from windmenu.toml with:
 #   import = ["packs/wt-keys-commands.toml"]
 

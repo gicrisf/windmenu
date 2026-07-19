@@ -32,6 +32,10 @@ font = "Consolas 20"                  # Font as "Family Size"
 # bg_input  = "#2d2d2d"   # Input box background
 # fg_input  = "#ffffff"   # Input box text
 #
+# Or grab a ready-made theme pack:
+#   windmenu config pack list
+#   windmenu config pack install <name>
+#
 # Or define your own with  [themes.<name>] using the same keys
 # Switch between them with `theme = "<name>"`
 

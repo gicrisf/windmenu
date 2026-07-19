@@ -624,6 +624,20 @@ const EMBEDDED_PACKS: &[EmbeddedPack] = &[
         content: include_str!("../packs/hatsunemiku-theme.toml"),
     },
     EmbeddedPack {
+        name: "nord",
+        kind: PackKind::Theme,
+        path: "packs/nord-theme.toml",
+        description: "Nord — arctic-inspired color scheme",
+        content: include_str!("../packs/nord-theme.toml"),
+    },
+    EmbeddedPack {
+        name: "tokyonight",
+        kind: PackKind::Theme,
+        path: "packs/tokyonight-theme.toml",
+        description: "Tokyo Night — deep blue with red accent",
+        content: include_str!("../packs/tokyonight-theme.toml"),
+    },
+    EmbeddedPack {
         name: "power",
         kind: PackKind::Command,
         path: "packs/power-commands.toml",

@@ -1,0 +1,19 @@
+# ===============================================================================
+# WindMenu Theme Pack — Tokyo Night
+# ===============================================================================
+# Import from windmenu.toml with:
+#   import = ["packs/tokyonight-theme.toml"]
+# Then select the scheme:
+#   theme = "tokyonight"
+
+[themes.tokyonight]
+bg        = "#1f2335"
+fg        = "#c0caf5"
+bg_select = "#f7768e"
+fg_select = "#1f2335"
+bg_input  = "#1a1b26"
+fg_input  = "#c0caf5"
+
+# Alternative accent colors for bg_select:
+# - Red:     #f7768e (current)   - Blue:    #7aa2f7   - Cyan:  #4abaaf
+# - Magenta: #9a7ecc             - Green:   #9ece6a   - Yellow: #e0af68

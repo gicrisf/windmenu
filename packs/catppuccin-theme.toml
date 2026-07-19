@@ -1,8 +1,6 @@
 # ===============================================================================
 # WindMenu Theme Pack — Catppuccin
 # ===============================================================================
-# Install with:
-#   windmenu config pack install catppuccin
 # Import from windmenu.toml with:
 #   import = ["packs/catppuccin-theme.toml"]
 # Then pick a scheme:

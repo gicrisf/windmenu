@@ -1,8 +1,6 @@
 # ===============================================================================
 # WindMenu Theme Pack — dmenu
 # ===============================================================================
-# Install with:
-#   windmenu config pack install dmenu
 # Import from windmenu.toml with:
 #   import = ["packs/dmenu-theme.toml"]
 # Then select the scheme:
