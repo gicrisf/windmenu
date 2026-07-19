@@ -1,6 +1,6 @@
 [package]
 name = "windmenu"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "A minimalist Windows launcher"
 license = "GPL-3.0-only"

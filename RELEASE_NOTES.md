@@ -1,3 +1,7 @@
+## Custom navigation keys (0.6.1)
+
+- In-menu next/prev selection combos — default Ctrl+J / Ctrl+K — are now configurable via `next` and `prev` in `windmenu.toml`, using the same token-array format as `hotkey` (e.g., `next = ["CTRL", "N"]`, `prev = ["CTRL", "P"]`). Arrow keys always work regardless. ALT/WIN modifiers are rejected since those keydowns fire as `WM_SYSKEYDOWN` which the menu edit control doesn't handle; limit navigation combos to CTRL/SHIFT plus one key.
+
 ## Single-process architecture (0.6.0)
 
 The menu renderer is now a native Rust module inside `windmenu.exe` — a full port of the wlines C renderer. The two-process design (windmenu.exe + wlines-daemon.exe over a named pipe, with wlines.exe CLI fallback) is gone, and with it the main source of instability: pipe races, daemon lifecycle detection, and silent fallback paths.
