@@ -6,11 +6,12 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 ## Features
 
 - Fast application launcher via hotkey (Ctrl+Alt+Space is default)
+- Horizontal single-row bar mode
 - Vim-like navigation (Ctrl+J/K) alongside arrow keys
 - Scans Windows Start Menu shortcuts automatically
 - Supports custom commands via configuration
-- Key combination commands - trigger keyboard shortcuts from the menu
-- Single self-contained executable - the menu renderer is built in
+- Trigger keyboard shortcuts from commands in the menu
+- Single self-contained executable
 - Configurable appearance and behavior (thanks to JerwuQu's work on the original version of [wlines](https://github.com/gicrisf/wlines), which the built-in renderer is ported from)
 
 ## Installation
@@ -64,6 +65,8 @@ windmenu daemon enable user-folder
 
 This places a `windmenu.lnk` shortcut in your Startup folder. No admin required. Alternatively, use `registry` to add windmenu to the Run key (`HKCU\...\Run`). See all available methods with `windmenu daemon enable --help`.
 
+## Configuration
+
 ### Customizing the Hotkey
 
 To customize the hotkey or add your own commands, edit `windmenu.toml` in the same directory as the executable:
@@ -80,9 +83,19 @@ hotkey = ["CTRL", "ALT", "SPACE"]  # Default
 
 For full configuration options, check the [example windmenu.toml](https://github.com/gicrisf/windmenu/blob/main/windmenu.toml) in the repository.
 
-## Theming
+### Window
 
-Windmenu ships with a built-in color scheme (a Windows-blue dark look) that is always active — a fresh config needs no color settings at all. To tweak it, set any of the six color keys at the top level of `windmenu.toml`; they override the active theme:
+Set `horizontal = true` for a single-row bar at the top of the screen (dmenu -h style). Entries flow left-to-right with `<` / `>` page markers when they overflow.
+
+```toml
+width = 0       # Full screen width
+center = false  # Pin to top-left
+horizontal = true
+```
+
+### Theming
+
+Windmenu ships with a built-in color scheme (a Windows-blue dark look) that is active by default. To tweak it, set any of the six color keys at the top level of `windmenu.toml`:
 
 ```toml
 bg        = "#1e1e1e"   # Window background
@@ -93,7 +106,7 @@ bg_input  = "#2d2d2d"   # Input box background
 fg_input  = "#ffffff"   # Input box text
 ```
 
-To keep several color schemes on hand, define named themes and switch between them with `theme`:
+If you override them all, you essentially have defined a new theme, since a theme is just these 6 colors hex code. If you need to keep several color schemes on hand, define named themes and switch between them with `theme`:
 
 ```toml
 theme = "nord"
@@ -107,7 +120,7 @@ bg_input  = "#3b4252"
 fg_input  = "#d8dee9"
 ```
 
-`theme = "default"` is reserved for the built-in scheme, so you can always switch back. An unknown theme name is never fatal — windmenu warns (visible in `windmenu config path`) and keeps the built-in colors. Top-level color keys always win over the selected theme, so you can pick a theme and still override just its accent.
+`theme = "default"` is reserved for the built-in scheme, so you can always switch back. An unknown theme name is never fatal because windmenu warns (visible in `windmenu config path`) and keeps the built-in colors. Top-level color keys always win over the selected theme, so you can pick a theme and still override just its accent.
 
 ## Commands
 
@@ -271,15 +284,6 @@ scoop uninstall windmenu
 ```
 
 For other installations, delete the installation directory (`$HOME\.windmenu` if you used the script). The application is fully portable (all binaries and configuration reside within it, so no traces are left elsewhere).
-
-## Upgrading from 0.5.x
-
-Since 0.6.0 the menu renderer is built into `windmenu.exe`; the separate `wlines-daemon.exe` process, the named pipe, and the `wlines.exe` fallback are gone. After upgrading:
-
-1. Remove any auto-start entries for the old wlines daemon (with the **old** binary: `windmenu daemon wlines disable <method>`, or delete them manually from `HKCU\...\Run` / Task Scheduler / the Startup folder).
-2. Stop and delete any leftover `wlines-daemon.exe`.
-3. Delete old `start-windmenu-daemon-*.vbs` / `start-wlines-daemon-*.vbs` files from your Startup folders (`shell:startup`, `shell:common startup`); the `user-folder` method now uses a plain `windmenu.lnk` shortcut.
-4. The `wlines_daemon_path` / `wlines_cli_path` config keys and the generated `wlines-config.txt` file are no longer used; the `windmenu fetch` and `windmenu daemon wlines|all` commands were removed (use `windmenu daemon ...`).
 
 ## Troubleshooting
 
