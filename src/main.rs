@@ -10,13 +10,12 @@ use std::thread;
 use clap::{Parser, Subcommand};
 
 mod apps;
-mod reg;
 mod daemon;
 mod menu;
 mod theme;
 mod wlines;
 
-use daemon::{Daemon, DaemonError, StartupMethod, WindmenuDaemon};
+use daemon::{Daemon, DaemonError, WindmenuDaemon};
 use apps::print_reparse_points_info;
 use menu::Menu;
 
@@ -107,18 +106,6 @@ enum DaemonAction {
     Restart,
     /// Check daemon status
     Status,
-    /// Enable startup method
-    Enable {
-        /// Startup method to enable
-        #[arg(value_enum)]
-        method: StartupMethod,
-    },
-    /// Disable startup method (all methods if none given)
-    Disable {
-        /// Startup method to disable; omit to disable all
-        #[arg(value_enum)]
-        method: Option<StartupMethod>,
-    },
 }
 
 #[derive(Subcommand)]
@@ -360,39 +347,6 @@ fn handle_daemon_action<T: Daemon>(action: DaemonAction, daemon: &T) {
             let status = daemon.get_status();
             println!("windmenu daemon status:");
             print!("{}", status);
-        }
-        DaemonAction::Enable { method } => {
-            match daemon.enable_startup(&method) {
-                Ok(()) => {
-                    println!("windmenu daemon startup method '{}' enabled successfully", method);
-                }
-                Err(err) => {
-                    eprintln!("Failed to enable windmenu daemon startup method '{}': {}", method, err);
-                    cli_exit(1);
-                }
-            }
-        }
-        DaemonAction::Disable { method } => {
-            let methods: Vec<StartupMethod> = match method {
-                Some(m) => vec![m],
-                None => vec![StartupMethod::Registry, StartupMethod::UserFolder],
-            };
-
-            let mut failed = false;
-            for m in methods {
-                match daemon.disable_startup(&m) {
-                    Ok(()) => {
-                        println!("windmenu daemon startup method '{}' disabled successfully", m);
-                    }
-                    Err(err) => {
-                        eprintln!("Failed to disable windmenu daemon startup method '{}': {}", m, err);
-                        failed = true;
-                    }
-                }
-            }
-            if failed {
-                cli_exit(1);
-            }
         }
     }
 }

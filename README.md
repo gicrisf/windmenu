@@ -50,20 +50,33 @@ cargo install --git https://github.com/gicrisf/windmenu
 > direct download for the latest published release. Cargo compiles windmenu from
 > source on your Windows host, so a Rust toolchain is required. `cargo uninstall
 > windmenu` removes the binary but does not stop a running daemon nor clean up
-> auto-start entries — run `windmenu daemon stop` followed by
-> `windmenu daemon disable` before uninstalling.
+> any auto-start shortcut you created — run `windmenu daemon stop` and remove the
+> Startup-folder shortcut (see below) before uninstalling.
 
 Press `Ctrl+Alt+Space` to launch.
 
 ### Auto-Startup
 
-To have windmenu start automatically when you log in:
+windmenu no longer manages auto-start itself — it is a plain Startup-folder
+shortcut or registry Run-key entry that you create once with PowerShell. The
+Scoop package and the NSIS installer set this up for you; do it manually with:
 
 ```powershell
-windmenu daemon enable user-folder
+# Enable — Startup folder shortcut (no admin required)
+$lnk = Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk'
+$s = (New-Object -ComObject WScript.Shell).CreateShortcut($lnk)
+$s.TargetPath = (Get-Command windmenu).Source
+$s.Arguments  = 'daemon start'
+$s.Save()
+
+# Disable
+Remove-Item (Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk')
 ```
 
-This places a `windmenu.lnk` shortcut in your Startup folder. No admin required. Alternatively, use `registry` to add windmenu to the Run key (`HKCU\...\Run`). See all available methods with `windmenu daemon enable --help`.
+Prefer the registry Run key instead? `Set-ItemProperty` /
+`Remove-ItemProperty` on
+`HKCU:\Software\Microsoft\Windows\CurrentVersion\Run` under the name
+`WindmenuDaemon` works the same way.
 
 ## Configuration
 
@@ -264,20 +277,22 @@ cargo build --release
 
 ## Uninstallation
 
-First, stop the daemon and remove auto-startup entries, otherwise the system will try to launch something that no longer exists at the next startup:
+First, stop the daemon and remove any auto-startup shortcut you created,
+otherwise the system will try to launch something that no longer exists at the
+next startup:
 
 ```powershell
 windmenu daemon stop
-windmenu daemon disable
+Remove-Item (Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk') -ErrorAction SilentlyContinue
 ```
 
-Check the situation with
+Check whether the daemon is still running with
 
 ``` powershell
 windmenu daemon status
 ```
 
-If no instance is running and no startup configuration is still enabled, proceed by removing the binaries. If installed via Scoop:
+If no instance is running, proceed by removing the binaries. If installed via Scoop (which also removes the Startup shortcut automatically):
 
 ```powershell
 scoop uninstall windmenu
