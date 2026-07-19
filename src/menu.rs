@@ -307,6 +307,7 @@ struct MenuConfig {
     case_sensitive: Option<bool>, // Match case exactly (default: false)
 
     // Window geometry and font.
+    horizontal: Option<bool>, // Single-row bar; entries flow left-to-right, `lines` is ignored
     lines: Option<usize>,   // Lines to show
     width: Option<usize>,   // Window width (centers the window)
     padding: Option<usize>, // Window padding
@@ -466,6 +467,9 @@ fn resolve_settings(cfg: &MenuConfig) -> (wlines::Settings, Vec<String>) {
     cfg.colors.apply(&mut settings);
 
     // 3. Window geometry and font.
+    if let Some(horizontal) = cfg.horizontal {
+        settings.horizontal = horizontal;
+    }
     if let Some(lines) = cfg.lines {
         settings.line_count = lines;
     }
@@ -1434,6 +1438,17 @@ mod tests {
         assert_eq!(settings.prompt.as_deref(), Some("Run:"));
         assert!(settings.case_sensitive);
         assert_eq!(cfg.hotkey, Some(vec!["ALT".to_string(), "F2".to_string()]));
+    }
+
+    #[test]
+    fn horizontal_flag_applies() {
+        let cfg = parse_config("horizontal = true");
+        let (settings, warnings) = resolve_settings(&cfg);
+        assert!(warnings.is_empty());
+        assert!(settings.horizontal);
+
+        let (settings, _) = resolve_settings(&parse_config(""));
+        assert!(!settings.horizontal);
     }
 
     #[test]

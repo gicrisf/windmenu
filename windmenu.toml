@@ -23,6 +23,7 @@ case_sensitive = false                # Match case exactly (default: false)
 # prev = ["CTRL", "K"]                 # Move selection up
 
 # --- Window ---
+# horizontal = true                   # Single-row bar: entries flow left-to-right (`lines` is ignored)
 lines = 12                            # Number of menu items to display
 width = 1000                          # Window width in pixels (centers the window)
 padding = 8                           # Horizontal padding in pixels

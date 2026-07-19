@@ -26,7 +26,7 @@ use winapi::um::winuser::{
     MonitorFromPoint, PostQuitMessage, RedrawWindow, RegisterClassExW, SendMessageW, SetFocus,
     SetForegroundWindow,
     SetTimer, SetWindowLongPtrW, SetWindowLongW, SetWindowTextW, ShowWindow, TranslateMessage,
-    UpdateWindow, COLOR_WINDOW, DT_CALCRECT, DT_END_ELLIPSIS, DT_NOCLIP, DT_NOPREFIX,
+    UpdateWindow, COLOR_WINDOW, DT_CALCRECT, DT_END_ELLIPSIS, DT_NOCLIP, DT_NOPREFIX, DT_SINGLELINE,
     EC_LEFTMARGIN, EC_RIGHTMARGIN, EM_GETSEL, EM_SETMARGINS, EM_SETSEL, ES_AUTOHSCROLL,
     ES_AUTOVSCROLL, ES_LEFT, GWLP_USERDATA, GWLP_WNDPROC, GWL_STYLE, IDC_ARROW,
     MONITORINFO, MONITOR_DEFAULTTONEAREST, MSG,
@@ -91,6 +91,7 @@ impl KeyCombo {
 #[derive(Debug, Clone)]
 pub struct Settings {
     pub line_count: usize,
+    pub horizontal: bool, // Single-row bar; entries flow left-to-right, line_count is ignored
     pub prompt: Option<String>,
     pub filter_mode: FilterMode,
     pub initial_index: usize,
@@ -114,6 +115,7 @@ impl Default for Settings {
     fn default() -> Self {
         Settings {
             line_count: 15,
+            horizontal: false,
             prompt: None,
             filter_mode: FilterMode::Fuzzy,
             initial_index: 0,
@@ -155,6 +157,7 @@ struct Entry {
     text: String,
     lower: String,
     wide: Vec<u16>,
+    width: i32, // text width in px; measured in create_window, horizontal mode only
 }
 
 struct State {
@@ -183,6 +186,26 @@ struct State {
     result: Option<String>,
 }
 
+/// Greedily pack cell widths into pages of at most `avail` width, returning
+/// the first index of each page. Every page holds at least one cell, so a
+/// cell wider than `avail` gets a page of its own (drawn ellipsized).
+fn pack_pages(widths: &[i32], avail: i32) -> Vec<usize> {
+    let mut starts = Vec::new();
+    let mut used = 0;
+    for (i, &w) in widths.iter().enumerate() {
+        if starts.is_empty() || used + w > avail {
+            starts.push(i);
+            used = 0;
+        }
+        used += w;
+    }
+    starts
+}
+
+// Layout: all geometry questions ("what's visible, where does entry N go,
+// what's under the cursor") are answered here, so the paint and mouse code
+// stays layout-agnostic. The vertical/horizontal branch lives only in these
+// helpers.
 impl State {
     fn font_hmargin(&self) -> i32 {
         self.settings.font_size / 6
@@ -192,11 +215,108 @@ impl State {
         self.settings.font_size + self.settings.padding
     }
 
-    fn page_start(&self) -> usize {
-        if self.line_count == 0 {
-            return 0;
+    /// Pixel width of the input box. Vertical mode gives it everything right
+    /// of the prompt; the horizontal bar caps it at a quarter of the width so
+    /// entries fit beside it.
+    fn input_width(&self) -> i32 {
+        let rest = self.width - self.settings.padding * 2 - self.prompt_width;
+        if self.settings.horizontal {
+            rest.min(self.width / 4)
+        } else {
+            rest
         }
-        (self.selected.unwrap_or(0) / self.line_count) * self.line_count
+    }
+
+    /// X where the entry cells start (horizontal mode): right of the input box.
+    fn entries_left(&self) -> i32 {
+        self.settings.padding + self.prompt_width + self.input_width()
+    }
+
+    /// Width of entry cell `idx` (into `search_results`): its text plus the
+    /// same side margins the vertical rows use.
+    fn cell_width(&self, idx: usize) -> i32 {
+        self.entries[self.search_results[idx]].width + self.font_hmargin() * 2
+    }
+
+    /// First result index of each page. Vertical pages are `line_count` fixed
+    /// rows; horizontal pages hold as many cells as fit in the bar. Empty when
+    /// nothing can be shown.
+    fn page_starts(&self) -> Vec<usize> {
+        let count = self.search_results.len();
+        if count == 0 {
+            return Vec::new();
+        }
+        if self.settings.horizontal {
+            let widths: Vec<i32> = (0..count).map(|i| self.cell_width(i)).collect();
+            let avail = self.width - self.settings.padding - self.entries_left();
+            pack_pages(&widths, avail)
+        } else {
+            if self.line_count == 0 {
+                return Vec::new();
+            }
+            (0..count).step_by(self.line_count).collect()
+        }
+    }
+
+    /// The page of results containing the selection.
+    fn visible_range(&self) -> std::ops::Range<usize> {
+        let starts = self.page_starts();
+        if starts.is_empty() {
+            return 0..0;
+        }
+        let sel = self.selected.unwrap_or(0);
+        let page = starts.partition_point(|&s| s <= sel) - 1;
+        let end = starts.get(page + 1).copied().unwrap_or(self.search_results.len());
+        starts[page]..end
+    }
+
+    /// Selection box of entry `idx`, which must lie in `visible_range()`. Text
+    /// is drawn inset by `font_hmargin` on each side.
+    fn entry_rect(&self, idx: usize) -> RECT {
+        let padding = self.settings.padding;
+        let font_size = self.settings.font_size;
+        if self.settings.horizontal {
+            let mut left = self.entries_left();
+            for i in self.visible_range().start..idx {
+                left += self.cell_width(i);
+            }
+            RECT {
+                left,
+                top: padding,
+                right: (left + self.cell_width(idx)).min(self.width - padding),
+                bottom: padding + font_size,
+            }
+        } else {
+            let row = (idx - self.visible_range().start) as i32;
+            let top = self.entries_top() + row * font_size;
+            RECT {
+                left: padding,
+                top,
+                right: self.width - padding,
+                bottom: top + font_size,
+            }
+        }
+    }
+
+    /// Result index under a client-area point, if any. Vertical mode keeps the
+    /// C behavior of clamping clicks past the end to the last entry.
+    fn hit_test(&self, x: i32, y: i32) -> Option<usize> {
+        if self.search_results.is_empty() {
+            return None;
+        }
+        if self.settings.horizontal {
+            self.visible_range().find(|&idx| {
+                let r = self.entry_rect(idx);
+                x >= r.left && x < r.right && y >= r.top
+            })
+        } else {
+            let entries_top = self.entries_top();
+            if y < entries_top || self.settings.font_size <= 0 {
+                return None;
+            }
+            let offset = ((y - entries_top) / self.settings.font_size).max(0) as usize;
+            Some((self.visible_range().start + offset).min(self.search_results.len() - 1))
+        }
     }
 }
 
@@ -505,21 +625,26 @@ unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
                     return 0;
                 }
                 VK_PRIOR => {
-                    // Page Up - Previous page
-                    if state.line_count > 0 {
-                        if let Some(sel) = state.selected {
-                            let page = sel.checked_div(state.line_count).unwrap_or(0);
-                            let target = page.saturating_sub(1) * state.line_count;
-                            set_selection(state, target);
+                    // Page Up - Start of the previous page
+                    if let Some(sel) = state.selected {
+                        let starts = state.page_starts();
+                        if !starts.is_empty() {
+                            let page = starts.partition_point(|&s| s <= sel) - 1;
+                            set_selection(state, starts[page.saturating_sub(1)]);
                         }
                     }
                     return 0;
                 }
                 VK_NEXT => {
-                    // Page Down - Next page
-                    if state.line_count > 0 {
-                        if let Some(sel) = state.selected {
-                            let target = (sel.checked_div(state.line_count).unwrap_or(0) + 1) * state.line_count;
+                    // Page Down - Start of the next page (or the last entry)
+                    if let Some(sel) = state.selected {
+                        let starts = state.page_starts();
+                        if !starts.is_empty() {
+                            let page = starts.partition_point(|&s| s <= sel) - 1;
+                            let target = starts
+                                .get(page + 1)
+                                .copied()
+                                .unwrap_or(state.search_results.len() - 1);
                             set_selection(state, target);
                         }
                     }
@@ -599,30 +724,25 @@ unsafe extern "system" fn main_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
             }
 
             // Draw entries
-            let entries_top = state.entries_top();
-            let page_start = state.page_start();
-            let mut text_rect = RECT {
-                left: padding + hmargin,
-                top: entries_top,
-                right: state.width - padding - hmargin,
-                bottom: state.height,
-            };
             SetTextColor(hdc, state.settings.fg);
-            let count = state.line_count.min(state.search_results.len().saturating_sub(page_start));
-            for idx in page_start..page_start + count {
+            for idx in state.visible_range() {
+                let rect = state.entry_rect(idx);
                 let is_selected = state.selected == Some(idx);
                 if is_selected {
                     SetDCPenColor(hdc, state.settings.bg_select);
                     SetDCBrushColor(hdc, state.settings.bg_select);
-                    Rectangle(hdc, padding, text_rect.top,
-                            state.width - padding,
-                            text_rect.top + font_size);
+                    Rectangle(hdc, rect.left, rect.top, rect.right, rect.bottom);
                     SetTextColor(hdc, state.settings.fg_select);
                 }
 
+                let mut text_rect = RECT {
+                    left: rect.left + hmargin,
+                    top: rect.top,
+                    right: rect.right - hmargin,
+                    bottom: rect.bottom,
+                };
                 let entry = &state.entries[state.search_results[idx]];
                 DrawTextW(hdc, entry.wide.as_ptr(), -1, &mut text_rect, DRAWTEXT_PARAMS);
-                text_rect.top += font_size;
 
                 if is_selected {
                     SetTextColor(hdc, state.settings.fg);
@@ -647,21 +767,17 @@ unsafe extern "system" fn main_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
             return 0;
         }
         WM_LBUTTONDOWN => {
+            let mx = (lparam & 0xffff) as i16 as i32; // GET_X_LPARAM
             let my = (lparam >> 16) as i16 as i32; // GET_Y_LPARAM
-            let entries_top = state.entries_top();
-            if my < entries_top || state.search_results.is_empty() || state.settings.font_size <= 0 {
-                return 0;
-            }
-            let page_start = state.page_start();
-            let offset = ((my - entries_top) / state.settings.font_size).max(0) as usize;
-            let new_idx = (page_start + offset).min(state.search_results.len() - 1);
-            if state.selected == Some(new_idx) {
-                // Second click on the same entry - select it
-                if let Some(text) = selected_entry_text(state) {
-                    finish(state, Some(text));
+            if let Some(new_idx) = state.hit_test(mx, my) {
+                if state.selected == Some(new_idx) {
+                    // Second click on the same entry - select it
+                    if let Some(text) = selected_entry_text(state) {
+                        finish(state, Some(text));
+                    }
+                } else {
+                    set_selection(state, new_idx);
                 }
-            } else {
-                set_selection(state, new_idx);
             }
             return 0;
         }
@@ -699,8 +815,13 @@ unsafe fn create_window(state: &mut State) -> Result<(), String> {
     let display_height = mon.bottom - mon.top;
 
     state.width = if state.settings.width > 0 { state.settings.width } else { display_width };
-    state.height = state.settings.font_size * (state.line_count as i32 + 1)
-            + state.settings.padding * 2;
+    state.height = if state.settings.horizontal {
+        // Single-row bar: input and entries share one line
+        state.settings.font_size + state.settings.padding * 2
+    } else {
+        state.settings.font_size * (state.line_count as i32 + 1)
+                + state.settings.padding * 2
+    };
 
     let (mut x, mut y) = (mon.left, mon.top);
     if state.settings.center_window {
@@ -717,20 +838,31 @@ unsafe fn create_window(state: &mut State) -> Result<(), String> {
         return Err(format!("CreateWindowExW failed: error {}", GetLastError()));
     }
 
-    // Calculate prompt width
-    if let Some(ref prompt_wide) = state.prompt_wide {
-        let mut prompt_rect = RECT {
-            left: 0,
-            top: 0,
-            right: state.width / 2 - state.settings.padding,
-            bottom: state.settings.font_size * 2,
-        };
+    // Measure the text the layout depends on: the prompt, and in horizontal
+    // mode every entry (cells are sized to their text)
+    if state.prompt_wide.is_some() || state.settings.horizontal {
         let tmp_hdc = CreateCompatibleDC(ptr::null_mut());
         SelectObject(tmp_hdc, state.font as _);
-        DrawTextW(tmp_hdc, prompt_wide.as_ptr(), -1,
-                &mut prompt_rect, DRAWTEXT_PARAMS | DT_CALCRECT);
+        if let Some(ref prompt_wide) = state.prompt_wide {
+            let mut prompt_rect = RECT {
+                left: 0,
+                top: 0,
+                right: state.width / 2 - state.settings.padding,
+                bottom: state.settings.font_size * 2,
+            };
+            DrawTextW(tmp_hdc, prompt_wide.as_ptr(), -1,
+                    &mut prompt_rect, DRAWTEXT_PARAMS | DT_CALCRECT);
+            state.prompt_width = prompt_rect.right - prompt_rect.left + state.font_hmargin() * 2;
+        }
+        if state.settings.horizontal {
+            for entry in &mut state.entries {
+                let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+                DrawTextW(tmp_hdc, entry.wide.as_ptr(), -1, &mut rect,
+                        DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
+                entry.width = rect.right - rect.left;
+            }
+        }
         DeleteDC(tmp_hdc);
-        state.prompt_width = prompt_rect.right - prompt_rect.left + state.font_hmargin() * 2;
     }
 
     // Create textbox
@@ -740,7 +872,7 @@ unsafe fn create_window(state: &mut State) -> Result<(), String> {
     state.edit_wnd = CreateWindowExW(0, edit_class.as_ptr(), empty.as_ptr(),
         WS_VISIBLE | WS_CHILD | ES_LEFT | ES_AUTOVSCROLL | ES_AUTOHSCROLL,
         textbox_left, state.settings.padding,
-        state.width - textbox_left - state.settings.padding, state.settings.font_size,
+        state.input_width(), state.settings.font_size,
         state.main_wnd, 101 as HMENU, ptr::null_mut(), ptr::null_mut());
     if state.edit_wnd.is_null() {
         return Err(format!("CreateWindowExW (edit) failed: error {}", GetLastError()));
@@ -809,6 +941,7 @@ unsafe fn show_inner(settings: &Settings, entries: &[String]) -> Option<String> 
         lower: text.to_lowercase(),
         wide: to_wide(text),
         text: text.clone(),
+        width: 0,
     }).collect();
 
     // Config sizes are 96-DPI logical pixels; scale for the target monitor
@@ -891,7 +1024,30 @@ unsafe fn show_inner(settings: &Settings, entries: &[String]) -> Option<String> 
 
 #[cfg(test)]
 mod tests {
-    use super::fuzzy_score;
+    use super::{fuzzy_score, pack_pages};
+
+    #[test]
+    fn pack_empty() {
+        assert_eq!(pack_pages(&[], 100), Vec::<usize>::new());
+    }
+
+    #[test]
+    fn pack_fills_pages_greedily() {
+        assert_eq!(pack_pages(&[10, 10, 10], 25), vec![0, 2]);
+    }
+
+    #[test]
+    fn pack_exact_fit_stays_on_page() {
+        assert_eq!(pack_pages(&[10, 10], 20), vec![0]);
+    }
+
+    #[test]
+    fn pack_oversized_cell_gets_own_page() {
+        // A cell wider than the bar still lands on a page of its own
+        // (it gets ellipsized when drawn), and never stalls the packing.
+        assert_eq!(pack_pages(&[50, 10], 30), vec![0, 1]);
+        assert_eq!(pack_pages(&[10, 50, 10], 30), vec![0, 1, 2]);
+    }
 
     #[test]
     fn non_subsequence_rejected() {
