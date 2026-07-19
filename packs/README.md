@@ -1,7 +1,31 @@
 # Packs
 
-Large sets of themes or commands can live in standalone files and be pulled
-into `windmenu.toml` with `import` (paths are relative to the config file):
+## Multiple themes
+
+A theme is a named set of the six color keys in a `[themes.<name>]` table.
+Define as many as you like in `windmenu.toml` and select one with `theme`:
+
+```toml
+theme = "nord"
+
+[themes.nord]
+bg        = "#2e3440"
+fg        = "#d8dee9"
+bg_select = "#5e81ac"
+fg_select = "#eceff4"
+bg_input  = "#3b4252"
+fg_input  = "#d8dee9"
+```
+
+`theme = "default"` selects the built-in scheme (an unknown name falls back to
+it too). Top-level color keys still win over the selected theme, so you can pick
+a theme and override just one accent.
+
+## Imports
+
+Defining lots of themes (or commands) inline bloats your config. Instead, keep
+each in a standalone file and pull it in with `import` (paths are relative to
+the config file):
 
 ```toml
 import = ["packs/catppuccin-theme.toml", "packs/power-commands.toml"]

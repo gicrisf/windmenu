@@ -24,14 +24,16 @@ case_sensitive = false                # Match case exactly (default: false)
 # prev = ["CTRL", "K"]                 # Move selection up
 
 # --- Window ---
-# horizontal = true                   # Single-row bar: entries flow left-to-right (`lines` is ignored)
-lines = 12                            # Number of menu items to display
-width = 1000                          # Fixed window width in pixels (0 = full screen width)
-# center = false                      # Set false to place the window at the monitor's top-left
-                                      # instead of centering it (default: true)
-padding = 8                           # Horizontal padding in pixels
-font = "Consolas 20"                  # Font as "Family Size"
-# prompt = "Run :"                    # Text shown in the input box (default: none)
+# (Default is vertical mode)
+# lines = 12                       # Number of menu items to display (only vertical mode)
+# padding = 8                      # Horizontal padding in pixels
+# font = "Consolas 20"             # Font as "Family Size"
+# prompt = "Run :"                 # Text shown in the input box
+
+# Uncomment the following lines to have the classic horizontal `dmenu -h` style:
+# horizontal = true                # Horizontal single-row bar
+# width = 0                        # Window width in pixels (0 = full screen)
+# center = false                   # Disable auto-centering and pin to top-left
 
 # --- Theme ---
 # To tweak the built-in theme colors, uncomment and set

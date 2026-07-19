@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 - Supports custom commands via configuration
 - Trigger keyboard shortcuts from commands in the menu
 - Single self-contained executable
-- Configurable appearance and behavior (thanks to JerwuQu's work on the original version of [wlines](https://github.com/gicrisf/wlines), which the built-in renderer is ported from)
+- Configurable appearance and behavior
 
 ## Installation
 
@@ -28,10 +28,7 @@ This downloads the latest release to `$HOME\.windmenu`, optionally adds it to yo
 
 ### Option 2: Scoop
 
-```
-scoop bucket add gicrisf https://github.com/gicrisf/bucket
-scoop install windmenu
-```
+`scoop bucket add gicrisf https://github.com/gicrisf/bucket && scoop install windmenu`
 
 ### Option 3: Direct Download
 
@@ -41,51 +38,31 @@ Press `Ctrl+Alt+Space` to launch.
 
 ### Option 4: Cargo Install
 
-```bash
-cargo install --git https://github.com/gicrisf/windmenu
-```
+`cargo install --git https://github.com/gicrisf/windmenu`
 
-> **Note**: This installs the current development version from the `main` branch
-> — it may include unreleased changes. Use the PowerShell script, Scoop, or
-> direct download for the latest published release. Cargo compiles windmenu from
-> source on your Windows host, so a Rust toolchain is required. `cargo uninstall
-> windmenu` removes the binary but does not stop a running daemon nor clean up
-> any auto-start shortcut you created — run `windmenu stop` and remove the
-> Startup-folder shortcut (see below) before uninstalling.
-
-Press `Ctrl+Alt+Space` to launch.
+Compiles the current development branch; requires a Rust toolchain on your Windows host.
 
 ### Auto-Startup
 
-windmenu no longer manages auto-start itself — it is a plain Startup-folder
-shortcut (or registry Run-key entry) that you create once. The Scoop package and
-the PowerShell installer set this up for you; for any other install (including
-`cargo install`) you enable it by hand.
+Auto-start is a plain Startup-folder shortcut (or registry Run-key entry) you
+create once. The Scoop package and the PowerShell installer set this up for you;
+for any other install (including `cargo install`) you enable it by hand.
 
-See [`autostart/README.md`](autostart/README.md) (shipped as `AUTOSTART.md` in
-`windmenu.zip`) for the copy-paste commands and the `autostart.ps1` helper.
+See [`autostart/README.md`](autostart/README.md) for the copy-paste commands and the `autostart.ps1` helper.
 
 ## Configuration
 
-### Customizing the Hotkey
+### Interaction
 
-To customize the hotkey or add your own commands, edit `windmenu.toml` in the same directory as the executable:
-
-```toml
-# Change the hotkey
-hotkey = ["CTRL", "ALT", "SPACE"]  # Default
-
-# Other combos to try:
-# hotkey = ["WIN", "R"]
-# hotkey = ["CTRL", "SPACE"]
-# hotkey = ["WIN", "SHIFT", "SPACE"]
-```
-
-For full configuration options, check the [example windmenu.toml](https://github.com/gicrisf/windmenu/blob/main/windmenu.toml) in the repository.
+Press `Ctrl+Alt+Space` to open the menu. Navigate with arrow keys or
+`Ctrl+J`/`Ctrl+K` (vim-style). Both the activation hotkey and the navigation
+keys are configurable in `windmenu.toml`.
 
 ### Window
 
-Set `horizontal = true` for a single-row bar at the top of the screen (dmenu -h style). Entries flow left-to-right with `<` / `>` page markers when they overflow.
+The menu is centered on your monitor by default. Pin it to a corner, resize it,
+or switch to a horizontal single-row bar at the top of the screen
+(dmenu -h style):
 
 ```toml
 width = 0       # Full screen width
@@ -95,7 +72,7 @@ horizontal = true
 
 ### Theming
 
-Windmenu ships with a built-in color scheme (a Windows-blue dark look) that is active by default. To tweak it, set any of the six color keys at the top level of `windmenu.toml`:
+A theme is just six colors. windmenu ships with a built-in scheme that is active by default; override any of the six keys at the top level of `windmenu.toml` to tweak it, or set all six to define your own:
 
 ```toml
 bg        = "#1e1e1e"   # Window background
@@ -106,145 +83,42 @@ bg_input  = "#2d2d2d"   # Input box background
 fg_input  = "#ffffff"   # Input box text
 ```
 
-If you override them all, you essentially have defined a new theme, since a theme is just these 6 colors hex code. If you need to keep several color schemes on hand, define named themes and switch between them with `theme`:
+To keep several named schemes on hand and switch between them, see [Config packs](packs/README.md).
 
-```toml
-theme = "nord"
+## Menu
 
-[themes.nord]
-bg        = "#2e3440"
-fg        = "#d8dee9"
-bg_select = "#5e81ac"
-fg_select = "#eceff4"
-bg_input  = "#3b4252"
-fg_input  = "#d8dee9"
-```
+Two types of entries appear in the menu:
 
-`theme = "default"` is reserved for the built-in scheme, so you can always switch back. An unknown theme name is never fatal because windmenu warns (visible in `windmenu config path`) and keeps the built-in colors. Top-level color keys always win over the selected theme, so you can pick a theme and still override just its accent.
+### Applications
 
-## Commands
+Discovered from your Start Menu automatically. The scan runs in the background
+at startup, so the hotkey works immediately.
 
-The menu is populated from three sources:
+### Commands
 
-### 1. Start Menu Shortcuts (discovered automatically)
+Add your own with `[[commands]]` entries in `windmenu.toml`:
 
-Windmenu scans for `.lnk` files in the Windows Start Menu directories (`%APPDATA%` and `%ProgramData%`). This is how it finds your installed applications. The scan runs in the background at startup, so the hotkey is available immediately while apps populate over the next few seconds. If you install a new application, use the `Refresh Apps` command from the menu to pick it up without restarting the daemon.
-
-### 2. Custom Commands (configured in `windmenu.toml`)
-
-You can add your own commands in two forms:
-
-**PowerShell invocations:**
 ```toml
 [[commands]]
 name = "Terminal"
 args = ["wt"]
-```
 
-**Key combinations:**
-```toml
 [[commands]]
 name = "Show Desktop"
 keys = ["WIN", "D"]
 ```
 
-The key combination support turned out to be more useful than expected. Want to switch virtual desktops? `["WIN", "CTRL", "RIGHT"]`. Toggle between windows? `["ALT", "TAB"]`. These are first-class commands in the menu, no different from launching applications.
+`args` runs a program; `keys` simulates a keyboard shortcut.
 
-Implementation uses Windows `SendInput` API with proper key sequencing (press all keys down in order, release in reverse). There's special handling for toggle keys like Caps Lock, which Windows treats differently.
+A few commands are always available:
 
-### 3. Special Commands (always active)
+- **Toggle Caps Lock**
+- **Refresh Apps** — rescan applications without restarting
+- **Reload Config** — reload commands from `windmenu.toml`
 
-These are built-in commands that are always available:
+## Supported Keys
 
-- **Toggle Caps Lock** — useful if you've remapped your physical Caps Lock key but occasionally need to toggle it
-- **WLAN Scan** — trigger a WiFi network scan
-- **Refresh Apps** — rescan the Start Menu and Windows Store apps without restarting the daemon
-- **Reload Config** — reload custom commands from `windmenu.toml` without restarting
-
-## Key Combination Commands
-
-WindMenu supports executing key combinations as commands! 
-
-Add them to your `windmenu.toml`:
-
-```toml
-[[commands]]
-name = "alt+x key combo"
-keys = ["ALT", "X"]
-
-[[commands]]
-name = "win+d show desktop"
-keys = ["WIN", "D"]
-
-[[commands]]
-name = "switch virtual desktop"
-keys = ["WIN", "CTRL", "RIGHT"]
-```
-
-### Supported Keys
-
-#### Modifier Keys
-- `ALT` - Alt key
-- `CTRL` or `CONTROL` - Control key  
-- `SHIFT` - Shift key
-- `WIN` or `WINDOWS` - Windows key
-
-#### Special Keys
-- `TAB` - Tab key
-- `ESC` or `ESCAPE` - Escape key
-- `SPACE` - Space bar
-- `ENTER` - Enter/Return key
-
-#### Function Keys
-- `F1`, `F2`, `F3`, ..., `F12` - Function keys
-
-#### Arrow Keys
-- `LEFT`, `UP`, `RIGHT`, `DOWN` - Arrow keys
-
-#### Number Keys
-- `0`, `1`, `2`, ..., `9` - Number keys
-
-#### Punctuation Keys
-- `COMMA` or `,` - Comma key
-- `PERIOD` or `.` - Period key
-- `SEMICOLON` or `;` - Semicolon key
-- `SLASH` or `/` - Forward slash key
-- `BACKSLASH` or `\` - Backslash key
-- `QUOTE` or `'` - Single quote key
-- `BACKTICK` or `` ` `` - Backtick key
-- `MINUS` or `-` - Minus/hyphen key
-- `EQUALS` or `=` - Equals key
-- `LBRACKET` or `[` - Left bracket key
-- `RBRACKET` or `]` - Right bracket key
-
-#### Letter Keys
-- `A`, `B`, `C`, ..., `Z` - Letter keys (case insensitive)
-
-### How It Works
-
-When you select a key combination command from the menu, WindMenu will:
-
-1. Press all the specified keys down in order
-2. Release all the keys in reverse order
-3. This simulates the key combination being pressed
-
-### Mixed Configuration
-
-You can mix regular commands and key combinations in the same configuration:
-
-```toml
-# Regular command
-[[commands]]
-name = "open terminal"
-args = ["wt"]
-
-# Key combination command
-[[commands]]
-name = "switch to desktop 1"
-keys = ["WIN", "CTRL", "1"]
-```
-
-The menu will display both types of commands and execute them appropriately based on their configuration.
+Valid key names for `keys = [...]` command combinations: modifiers (`ALT`, `CTRL`, `SHIFT`, `WIN`), `F1`–`F12`, arrow keys, `A`–`Z`, `0`–`9`, and special keys (`TAB`, `ESC`, `SPACE`, `ENTER`, punctuation). See [KEYS.md](KEYS.md) for the full reference.
 
 ## Config packs
 
@@ -254,48 +128,20 @@ Themes and commands can live in standalone pack files. See [`packs/README.md`](p
 import = ["packs/catppuccin-theme.toml", "packs/power-commands.toml"]
 ```
 
-## Build
-
-Build all components:
-
-```bash
-cargo build --release
-```
-
 ## Uninstallation
 
-First, stop the daemon and remove any auto-startup shortcut you created,
-otherwise the system will try to launch something that no longer exists at the
-next startup:
+For a portable or scripted installation: stop the daemon (`windmenu stop`),
+disable auto-start (`autostart.ps1 disable` — see [autostart](autostart/README.md)),
+then delete the installation folder.
 
-```powershell
-windmenu stop
-Remove-Item (Join-Path ([Environment]::GetFolderPath('Startup')) 'windmenu.lnk') -ErrorAction SilentlyContinue
-```
-
-Check whether the daemon is still running with
-
-``` powershell
-windmenu status
-```
-
-If no instance is running, proceed by removing the binaries. If installed via Scoop (which also removes the Startup shortcut automatically):
-
-```powershell
-scoop uninstall windmenu
-```
-
-For other installations, delete the installation directory (`$HOME\.windmenu` if you used the script). The application is fully portable (all binaries and configuration reside within it, so no traces are left elsewhere).
+Scoop and Cargo users: `scoop uninstall windmenu` or `cargo uninstall windmenu`
+handle everything on their own.
 
 ## Troubleshooting
 
-### Configuration not being read
-
-If windmenu doesn't seem to pick up your configuration changes, it may be reading `windmenu.toml` from a different location than you expect. Run `windmenu test config` to see which config file is being loaded and what values it contains.
-
-### Windows Store apps not appearing in the menu
-
-Windmenu discovers Windows Store apps by detecting reparse points in the Start Menu directories. If some apps are missing, run `windmenu test reparse-points` to verify that reparse point detection is working correctly on your system.
+If windmenu doesn't pick up your configuration, run `windmenu doctor` to see
+which config file is being loaded. If Windows Store apps are missing,
+`windmenu test reparse-points` checks that Store-app detection is working.
 
 ## Acknowledgments
 
