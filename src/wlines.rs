@@ -31,7 +31,7 @@ use winapi::um::winuser::{
     ES_AUTOVSCROLL, ES_LEFT, GWLP_USERDATA, GWLP_WNDPROC, GWL_STYLE, IDC_ARROW,
     MONITORINFO, MONITOR_DEFAULTTONEAREST, MSG,
     RDW_INVALIDATE, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE, SW_SHOW, VK_CONTROL, VK_DOWN, VK_END,
-    VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR, VK_RETURN, VK_SHIFT, VK_UP, WM_CHAR,
+    VK_ESCAPE, VK_HOME, VK_LEFT, VK_NEXT, VK_PRIOR, VK_RETURN, VK_RIGHT, VK_SHIFT, VK_UP, WM_CHAR,
     WM_CLOSE, WM_CTLCOLOREDIT, WM_KEYDOWN, WM_KEYUP, WM_KILLFOCUS, WM_LBUTTONDOWN,
     WM_MOUSEWHEEL, WM_PAINT, WM_SETFONT, WM_TIMER, WNDCLASSEXW, WS_CHILD, WS_EX_TOOLWINDOW,
     WS_EX_TOPMOST, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_VISIBLE, PAINTSTRUCT,
@@ -520,6 +520,15 @@ unsafe fn call_orig_edit(state: &State, wnd: HWND, msg: UINT, wparam: WPARAM, lp
     CallWindowProcW(mem::transmute::<isize, Option<unsafe extern "system" fn(HWND, UINT, WPARAM, LPARAM) -> LRESULT>>(state.edit_proc), wnd, msg, wparam, lparam)
 }
 
+/// Current EDIT selection as (start, end) caret positions (UTF-16 units).
+unsafe fn edit_caret(state: &State, wnd: HWND) -> (u32, u32) {
+    let mut start: u32 = 0;
+    let mut end: u32 = 0;
+    call_orig_edit(state, wnd, EM_GETSEL as UINT,
+            &mut start as *mut u32 as WPARAM, &mut end as *mut u32 as LPARAM);
+    (start, end)
+}
+
 unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     let state = match state_from_wnd(wnd) {
         Some(s) => s,
@@ -541,12 +550,10 @@ unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
                 }
                 0x7f => {
                     // Ctrl+Backspace - Simulate traditional word-delete behavior
-                    let mut end_sel: u32 = 0;
-                    let mut start_sel: u32 = 0;
-                    call_orig_edit(state, wnd, EM_GETSEL as UINT, 0, &mut end_sel as *mut u32 as LPARAM);
+                    let (_, end_sel) = edit_caret(state, wnd);
                     call_orig_edit(state, wnd, WM_KEYDOWN, VK_LEFT as WPARAM, 0);
                     call_orig_edit(state, wnd, WM_KEYUP, VK_LEFT as WPARAM, 0);
-                    call_orig_edit(state, wnd, EM_GETSEL as UINT, &mut start_sel as *mut u32 as WPARAM, 0);
+                    let (start_sel, _) = edit_caret(state, wnd);
                     call_orig_edit(state, wnd, EM_SETSEL as UINT, start_sel as WPARAM, end_sel as LPARAM);
                     call_orig_edit(state, wnd, WM_CHAR, 0x08, 0); // Backspace
                 }
@@ -615,6 +622,23 @@ unsafe extern "system" fn edit_wnd_proc(wnd: HWND, msg: UINT, wparam: WPARAM, lp
                 VK_DOWN => {
                     move_selection(state, 1);
                     return 0;
+                }
+                // Edge-triggered navigation (dmenu's rule): an unmodified
+                // Left/Right moves the selection once the caret can't travel
+                // any further in that direction, and keeps editing text
+                // otherwise. Ctrl/Shift+arrows stay pure text operations.
+                VK_LEFT if !ctrl_pressed && !shift_pressed => {
+                    if edit_caret(state, wnd) == (0, 0) {
+                        move_selection(state, -1);
+                        return 0;
+                    }
+                }
+                VK_RIGHT if !ctrl_pressed && !shift_pressed => {
+                    let len = GetWindowTextLengthW(state.edit_wnd) as u32;
+                    if edit_caret(state, wnd) == (len, len) {
+                        move_selection(state, 1);
+                        return 0;
+                    }
                 }
                 VK_HOME => {
                     set_selection(state, 0);

@@ -18,7 +18,8 @@ case_sensitive = false                # Match case exactly (default: false)
 
 # --- Navigation ---
 # Keys that move the selection while the menu is open (CTRL/SHIFT + one key).
-# Defaults are Ctrl+J / Ctrl+K; arrow keys always work regardless of this.
+# Defaults are Ctrl+J / Ctrl+K. Up/Down always work regardless; Left/Right
+# also navigate whenever the text caret is at that end of the input.
 # next = ["CTRL", "J"]                 # Move selection down
 # prev = ["CTRL", "K"]                 # Move selection up
 
