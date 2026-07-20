@@ -46,9 +46,7 @@ Compiles the current development branch; requires a Rust toolchain on your Windo
 
 Auto-start is a plain Startup-folder shortcut (or registry Run-key entry) you
 create once. The Scoop package and the PowerShell installer set this up for you;
-for any other install (including `cargo install`) you enable it by hand.
-
-See [`autostart/README.md`](autostart/README.md) for the copy-paste commands and the `autostart.ps1` helper.
+for any other install (including `cargo install`) you enable it by hand (see [`autostart/README.md`](autostart/README.md)).
 
 ## Configuration
 
@@ -83,7 +81,7 @@ bg_input  = "#2d2d2d"   # Input box background
 fg_input  = "#ffffff"   # Input box text
 ```
 
-To keep several named schemes on hand and switch between them, see [Config packs](packs/README.md).
+To keep several named schemes on hand and switch between them, see [Config packs](#config-packs).
 
 ## Menu
 
@@ -112,7 +110,7 @@ keys = ["WIN", "D"]
 
 A few commands are always available:
 
-- **Toggle Caps Lock**
+- **Toggle Caps Lock** — handy when the physical key is remapped
 - **Refresh Apps** — rescan applications without restarting
 - **Reload Config** — reload commands from `windmenu.toml`
 
@@ -122,11 +120,24 @@ Valid key names for `keys = [...]` command combinations: modifiers (`ALT`, `CTRL
 
 ## Config packs
 
-Themes and commands can live in standalone pack files. See [`packs/README.md`](packs/README.md) for details.
+Themes and commands can live in standalone pack files that you pull in with
+`import`. Ready-made ones live in a separate repo,
+[windmenu-packs](https://github.com/gicrisf/windmenu-packs) — clone it next to
+your `windmenu.toml` and import what you want:
+
+```bash
+git clone https://github.com/gicrisf/windmenu-packs packs
+```
 
 ```toml
-import = ["packs/catppuccin-theme.toml", "packs/power-commands.toml"]
+import = ["packs/themes/catppuccin.toml", "packs/commands/power.toml"]
+theme  = "catppuccin-mocha"
 ```
+
+A theme is inert until you select it with `theme`; a command pack activates on
+import. Imports are non-recursive and missing/broken files are warned-and-skipped,
+so windmenu always starts. Your `windmenu.toml` always wins over imports, and
+among imports the later one wins.
 
 ## Uninstallation
 

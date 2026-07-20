@@ -23,3 +23,10 @@
 - History is persisted to `windmenu_history.txt` next to the config file (or next to `windmenu.exe` when no config exists) — plain `count<TAB>name` lines, easy to inspect or edit. Top 500 entries kept; the long tail drops on save
 - Crash-safe writes: goes through a temp file + rename so a mid-save crash can't truncate history
 - No file is created until the first launch; history is a convenience and errors are silently ignored
+
+## Bundled packs removed
+
+- `config pack list` / `install` / `show` are removed. The bundled theme and
+  command packs no longer ship in the binary. (The `import` system and `[themes.*]`
+  loading are unchanged; your config with `import = [...]` lines still works.)
+- **Breaking:** `windmenu config pack …` subcommands are gone.

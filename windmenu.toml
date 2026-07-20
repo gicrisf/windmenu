@@ -3,65 +3,57 @@
 # ===============================================================================
 # Controls the appearance and behavior of WindMenu, a Windows application
 # launcher with a dmenu-like interface. Changes apply on daemon restart.
-
+#
 # --- Daemon ---
 # Activation hotkey: any number of modifiers (WIN/CTRL/ALT/SHIFT) plus one other key.
-hotkey = ["CTRL", "ALT", "SPACE"]
+# hotkey = ["CTRL", "ALT", "SPACE"]
 
 # --- Search ---
-# matching: how the typed query is compared against each entry
-#   "complete" - whole query matched as a substring
-#   "keywords" - each whitespace-separated word must match
-#   "fuzzy"    - fzf-style subsequence scoring, results sorted by score (default)
-matching = "fuzzy"
-case_sensitive = false                # Match case exactly (default: false)
-# history = false                     # Disable most-used-first ordering (default: true)
+# matching: how the typed query is compared against entries.
+# matching = "fuzzy"       # fzf-style subsequence scoring, sorted by score (default)
+# matching = "complete"    #   ...whole query matched as a substring
+# matching = "keywords"    #   ...each whitespace-separated word must match
+# case_sensitive = false   # match case exactly
+# history = true           # most-used-first ordering
 
 # --- Navigation ---
 # Keys that move the selection while the menu is open (CTRL/SHIFT + one key).
-# Defaults are Ctrl+J / Ctrl+K. Up/Down always work regardless; Left/Right
-# also navigate whenever the text caret is at that end of the input.
-# next = ["CTRL", "J"]                 # Move selection down
-# prev = ["CTRL", "K"]                 # Move selection up
+# Up/Down always work; Left/Right also navigate when the caret is already at
+# that end of the input.
+# next = ["CTRL", "J"]     # move to next entry (down / right)
+# prev = ["CTRL", "K"]     # move to previous entry (up / left)
 
 # --- Window ---
-# (Default is vertical mode)
-# lines = 12                       # Number of menu items to display (only vertical mode)
-# padding = 8                      # Horizontal padding in pixels
-# font = "Consolas 20"             # Font as "Family Size"
-# prompt = "Run :"                 # Text shown in the input box
+# lines   = 12             # menu items shown at once (vertical mode only)
+# width   = 1000           # window width in pixels
+# center  = true           # center on screen
+# padding = 8              # horizontal padding in pixels
+# font    = "Consolas 20"  # font as "Family Size"
+# prompt  = "Run :"        # text shown in the input box (default: none)
 
-# Uncomment the following lines to have the classic horizontal `dmenu -h` style:
-# horizontal = true                # Horizontal single-row bar
-# width = 0                        # Window width in pixels (0 = full screen)
-# center = false                   # Disable auto-centering and pin to top-left
+# Classic horizontal `dmenu -h` style (a single row across the top):
+# horizontal = true
+# width      = 0           # 0 = full monitor width
+# center     = false       # disable auto-centering and pin to top-left
 
 # --- Theme ---
-# To tweak the built-in theme colors, uncomment and set
-# bg        = "#1e1e1e"   # Window background
-# fg        = "#ffffff"   # Window text
-# bg_select = "#0078d4"   # Selected item background
-# fg_select = "#ffffff"   # Selected item text
-# bg_input  = "#2d2d2d"   # Input box background
-# fg_input  = "#ffffff"   # Input box text
+# The built-in default is a Windows-blue scheme. Uncomment and set these six
+# values to your liking (the example below reproduces a classic dmenu look):
+# bg        = "#222222"   # Window background
+# fg        = "#bbbbbb"   # Window text
+# bg_select = "#005577"   # Selected item background
+# fg_select = "#eeeeee"   # Selected item text
+# bg_input  = "#222222"   # Input box background
+# fg_input  = "#bbbbbb"   # Input box text
 #
-# Or grab a ready-made theme pack:
-#   windmenu config pack list
-#   windmenu config pack install <name>
-#
-# Or define your own with  [themes.<name>] using the same keys
-# Switch between them with `theme = "<name>"`
+# Or define your own [themes.<name>] with the same six keys and select it with `theme`.
 
 # --- Custom Commands ---
-# Entries shown alongside discovered applications.
-[[commands]]
-name = "Windows Terminal"
-args = ["wt"]                 # Example using `args`: runs a shell command/program
-
-[[commands]]
-name = "Shutdown"
-args = ["shutdown.exe", "/s"] # Another shell command, this time with flags
-
-[[commands]]
-name = "Maximize Window"
-keys = ["WIN", "UP"]          # Example using `keys`: keyboard shortcut
+# Extra entries shown alongside discovered apps.
+# [[commands]]
+# name = "Windows Terminal"
+# args = ["wt"]           # `args` runs a program
+#
+# [[commands]]
+# name = "Maximize Window"
+# keys = ["WIN", "UP"]    # `keys` simulates a keyboard shortcut.

@@ -2,14 +2,14 @@
 
 windmenu does **not** manage auto-start itself: the launcher just runs when you
 tell it to (`windmenu start`). Starting it automatically at login is a one-time
-setup you do with a standard Windows mechanism. There are two:
+setup you do with a standard Windows mechanism. Two are suggested:
 
 | Mechanism | Where it lives                               |
 |-----------|----------------------------------------------|
 | Startup   | A `windmenu.lnk` in your Startup folder      |
 | Registry  | `HKCU\...\CurrentVersion\Run\WindmenuDaemon` |
 
-Either one launches `windmenu start` at login. Pick **one**. `windmenu doctor`
+Either one launches `windmenu start` at login. `windmenu doctor`
 reports which (if any) is active, and it looks for exactly the shortcut name
 (`windmenu.lnk`) and registry value (`WindmenuDaemon`) used below, so stick to
 these and doctor stays accurate.
@@ -78,3 +78,9 @@ Remove it:
 ```powershell
 Remove-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' WindmenuDaemon
 ```
+
+## Doctor hints
+
+Run `windmenu doctor`: it prints the PowerShell commands to enable or
+disable auto-start, with the absolute path to your `windmenu.exe` baked in,
+ready to copy-paste without setting `$exe` yourself.

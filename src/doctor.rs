@@ -37,15 +37,21 @@ pub fn run(daemon: &WindmenuDaemon) {
     println!();
 
     println!("Auto-start");
+    // Absolute exe path to bake into the paste-ready PowerShell below, so the
+    // suggested commands work verbatim without the loose autostart.ps1.
+    let exe = env::current_exe().ok();
+    let startup_enabled = matches!(startup_shortcut_path(), Some(p) if p.exists());
     match startup_shortcut_path() {
         Some(p) if p.exists() => println!("  Startup folder: enabled  ({})", p.display()),
         Some(p) => println!("  Startup folder: not set  ({})", p.display()),
         None => println!("  Startup folder: unknown (APPDATA not set)"),
     }
+    let registry_enabled = read_run_key().is_some();
     match read_run_key() {
         Some(value) => println!("  Registry Run key: enabled  (HKCU\\{}\\{} -> {})", RUN_SUBKEY, RUN_VALUE_NAME, value),
         None => println!("  Registry Run key: not set"),
     }
+    print_autostart_hints(exe.as_deref(), startup_enabled, registry_enabled);
 
     // A bare Windows Store app count isn't an actionable health signal, and the
     // detail already lives in `windmenu test reparse-points`. Kept commented in
@@ -58,6 +64,45 @@ pub fn run(daemon: &WindmenuDaemon) {
     //     },
     //     None => println!("Windows Store apps: unknown (LOCALAPPDATA not set)"),
     // }
+}
+
+/// Print ready-to-paste PowerShell for toggling auto-start, with the absolute
+/// exe path baked in — the same actions as `autostart/autostart.ps1` (identical
+/// Run key/value and `.lnk` target + `start` args), so a bare `windmenu.exe`
+/// carries its own instructions without the loose helper script. Contextual:
+/// an *enable* line for each method that's off, a *disable* line for each on.
+fn print_autostart_hints(exe: Option<&std::path::Path>, startup_enabled: bool, registry_enabled: bool) {
+    let exe = match exe {
+        Some(p) => p.display().to_string(),
+        // No exe path (env::current_exe failed) — the commands would be wrong.
+        None => return,
+    };
+    let run_key = format!("HKCU:\\{}", RUN_SUBKEY);
+    // A PowerShell-quoted `$env:APPDATA\...\windmenu.lnk`; inside single quotes a
+    // literal `"` needs no escaping, so the baked paths stay readable.
+    let lnk = "\"$([Environment]::GetFolderPath('Startup'))\\windmenu.lnk\"";
+
+    println!();
+    if startup_enabled || registry_enabled {
+        println!("  Disable (paste into PowerShell):");
+        if startup_enabled {
+            println!("    Remove-Item {}", lnk);
+        }
+        if registry_enabled {
+            println!("    Remove-ItemProperty -Path '{}' -Name '{}'", run_key, RUN_VALUE_NAME);
+        }
+    } else {
+        println!("  Enable at login (paste into PowerShell) — Startup shortcut, no admin:");
+        println!(
+            "    $s=(New-Object -ComObject WScript.Shell).CreateShortcut({}); $s.TargetPath='{}'; $s.Arguments='start'; $s.Save()",
+            lnk, exe
+        );
+        println!("  Enable at login — Registry Run key:");
+        println!(
+            "    Set-ItemProperty -Path '{}' -Name '{}' -Value '\"{}\" start'",
+            run_key, RUN_VALUE_NAME, exe
+        );
+    }
 }
 
 /// `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\windmenu.lnk` —

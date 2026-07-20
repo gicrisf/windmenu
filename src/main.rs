@@ -37,12 +37,20 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Start the background daemon
+    ///
+    /// The daemon registers the activation hotkey (default Ctrl+Alt+Space)
+    /// and stays running in the background. Use 'windmenu stop' to stop it.
     Start,
     /// Stop the background daemon
     Stop,
     /// Restart the background daemon
     Restart,
     /// Report config, binary, daemon, and auto-start diagnostics
+    ///
+    /// Prints which config file is in effect, the binary path and PATH status,
+    /// whether the daemon is running, and which (if any) auto-start method is
+    /// enabled (with ready-to-paste PowerShell commands to enable or disable
+    /// auto-start).
     Doctor,
     /// Manage the windmenu.toml configuration
     Config {
@@ -66,37 +74,6 @@ enum ConfigAction {
     },
     /// Open the config in an editor (creating it if needed)
     Edit,
-    /// Manage bundled theme/command packs
-    Pack {
-        #[command(subcommand)]
-        action: PackAction,
-    },
-}
-
-#[derive(Subcommand)]
-enum PackAction {
-    /// List bundled packs
-    List {
-        /// Only theme packs
-        #[arg(long)]
-        themes: bool,
-        /// Only command packs
-        #[arg(long)]
-        commands: bool,
-    },
-    /// Write a bundled pack next to windmenu.toml
-    Install {
-        /// Pack name (see `config pack list`)
-        name: String,
-        /// Overwrite an existing pack file
-        #[arg(long)]
-        force: bool,
-    },
-    /// Print a bundled pack to stdout
-    Show {
-        /// Pack name (see `config pack list`)
-        name: String,
-    },
 }
 
 #[derive(Subcommand)]
@@ -329,14 +306,6 @@ fn handle_config_command(action: ConfigAction) {
     let code = match action {
         ConfigAction::Init { force } => menu::config_init(force),
         ConfigAction::Edit => menu::config_edit(),
-        ConfigAction::Pack { action } => match action {
-            PackAction::List { themes, commands } => {
-                menu::pack_list(themes, commands);
-                0
-            }
-            PackAction::Install { name, force } => menu::pack_install(&name, force),
-            PackAction::Show { name } => menu::pack_show(&name),
-        },
     };
     if code != 0 {
         cli_exit(code);
