@@ -16,37 +16,37 @@ https://github.com/user-attachments/assets/6e35eaa7-521a-4ec0-946a-990ad032c22f
 
 ## Installation
 
-### Option 1: PowerShell Script
+### Option 1: PowerShell
 
 ```powershell
 iex "& {$(irm https://raw.githubusercontent.com/gicrisf/windmenu/main/install.ps1)}"
 ```
 
-This downloads the latest release to `$HOME\.windmenu`, optionally adds it to your PATH, and prints next steps. No admin required.
-
-> **Note**: Windows Defender may flag `iex` (Invoke-Expression) as suspicious. If that happens, you can download and review `install.ps1` manually before running it.
-
-### Option 2: Scoop
-
-`scoop bucket add gicrisf https://github.com/gicrisf/bucket && scoop install windmenu`
-
-### Option 3: Direct Download
-
-Download `windmenu.zip` from the [latest release](https://github.com/gicrisf/windmenu/releases/latest), extract it, and run `.\windmenu.exe start`.
+No admin required.
 
 Press `Ctrl+Alt+Space` to launch.
 
-### Option 4: Cargo Install
+> Windows Defender may flag `iex` as suspicious. If so, check out the options below.
+
+### Option 2: ZIP
+
+The previous script downloads the latest release to `$HOME\.windmenu`, optionally adds it to your PATH, and lets you select an autostart method.
+
+You can do the exact same thing manually:
+- Download [`windmenu.zip`](https://github.com/gicrisf/windmenu/releases/latest)
+- Extract it wherever you prefer (e.g. `$HOME\.windmenu`)
+- Run `.\windmenu.exe start`
+- To start at boot, see [`autostart/README.md`](autostart/README.md).
+
+### Option 3: Scoop
+
+`scoop bucket add gicrisf https://github.com/gicrisf/bucket && scoop install windmenu`
+
+### Option 4: Cargo
 
 `cargo install --git https://github.com/gicrisf/windmenu`
 
 Compiles the current development branch; requires a Rust toolchain on your Windows host.
-
-### Auto-Startup
-
-Auto-start is a plain Startup-folder shortcut (or registry Run-key entry) you
-create once. The Scoop package and the PowerShell installer set this up for you;
-for any other install (including `cargo install`) you enable it by hand (see [`autostart/README.md`](autostart/README.md)).
 
 ## Configuration
 
