@@ -58,15 +58,29 @@ keys are configurable in `windmenu.toml`.
 
 ### Window
 
-The menu is centered on your monitor by default. Pin it to a corner, resize it,
-or switch to a horizontal single-row bar at the top of the screen
-(dmenu -h style):
+The menu comes in two layouts: **vertical** (default) and **horizontal**.
+
+By default, the menu is a centered rectangle with a vertical list of entries.
+The `lines` setting controls how many items are visible at once (default: 12):
 
 ```toml
-width = 0       # Full screen width
-center = false  # Pin to top-left
-horizontal = true
+lines  = 12      # menu items shown at once (vertical only)
+width  = 1000    # window width in pixels
+center = true    # center on the monitor under the cursor
 ```
+
+For a dmenu `-h` style single-row bar at the top of the screen, switch to
+horizontal layout:
+
+```toml
+horizontal = true
+width      = 0       # 0 = full monitor width
+center     = false   # pin to top-left
+```
+
+In horizontal mode entries flow left-to-right in a single row, the input box
+is capped at a quarter of the window width, and `<` / `>` page markers appear
+when there are more entries than fit on screen. The `lines` setting is ignored.
 
 ### Theming
 
@@ -124,10 +138,6 @@ Themes and commands can live in standalone pack files that you pull in with
 `import`. Ready-made ones live in a separate repo,
 [windmenu-packs](https://github.com/gicrisf/windmenu-packs) — clone it next to
 your `windmenu.toml` and import what you want:
-
-```bash
-git clone https://github.com/gicrisf/windmenu-packs packs
-```
 
 ```toml
 import = ["packs/themes/catppuccin.toml", "packs/commands/power.toml"]
