@@ -65,7 +65,7 @@ impl std::error::Error for MenuError {}
 #[derive(Debug, Clone)]
 pub enum MenuCommand {
     Start(PathBuf),            // For Start menu shortcuts
-    Configured(Vec<String>),  // For configured commands
+    Configured(Vec<String>, Option<String>),  // Configured command: args + optional cwd override
     KeyCombo(Vec<String>),    // For key combinations like ALT+X
     ToggleCapsLock,           // For caps lock toggle
     RefreshApps,              // Rescan Start Menu and Windows Store apps
@@ -90,8 +90,9 @@ impl EntryStore {
     fn apply_config_commands(&mut self, cmds: Vec<CommandConfig>) {
         let mut config = HashMap::new();
         for cmd in cmds {
+            let cwd = cmd.cwd;
             let (key, command) = match cmd.command_type {
-                CommandType::Args { args } => (cmd.name, MenuCommand::Configured(args)),
+                CommandType::Args { args } => (cmd.name, MenuCommand::Configured(args, cwd)),
                 CommandType::Keys { keys } => {
                     let key_sequence = keys.join(", ");
                     let formatted_key = format!("{} [{}]", cmd.name, key_sequence);
@@ -322,6 +323,11 @@ struct MenuConfig {
     #[serde(flatten)]
     colors: Palette,                     // Top-level color overrides
     themes: Option<HashMap<String, Palette>>,
+
+    // Working directory launched programs inherit. Set once at startup via
+    // env::set_current_dir; a per-command `cwd` overrides it. Missing path warns
+    // and is ignored (keeps the current directory).
+    cwd: Option<String>,
 
     commands: Option<Vec<CommandConfig>>,
 
@@ -741,6 +747,9 @@ fn split_command(command: &str) -> Vec<String> {
 #[derive(Debug, Deserialize)]
 struct CommandConfig {
     name: String,
+    // Optional working directory for this command only, overriding the global
+    // `cwd`. Applies to `args` commands; ignored for `keys`.
+    cwd: Option<String>,
     #[serde(flatten)]
     command_type: CommandType,
 }
@@ -822,6 +831,19 @@ impl Menu {
             }
             history_enabled = cfg.history.unwrap_or(true);
             history_dir = Some(config_dir);
+
+            // Global working directory for launched programs. The config is
+            // already resolved (via load_with_imports above) and history_dir is
+            // absolute, so changing the process cwd now is safe. Every child
+            // (ShellExecuteW shortcuts, CreateProcess commands) inherits it; a
+            // missing path warns and is ignored so the launcher still starts.
+            if let Some(dir) = cfg.cwd.as_deref() {
+                if !Path::new(dir).is_dir() {
+                    eprintln!("Warning: cwd '{}' does not exist; keeping current directory", dir);
+                } else if let Err(e) = env::set_current_dir(dir) {
+                    eprintln!("Warning: failed to set cwd '{}': {}", dir, e);
+                }
+            }
         }
 
         // The history file lives next to the config; with no config it sits
@@ -892,9 +914,9 @@ impl Menu {
                 println!("Executing Start command: {}", selected);
                 Self::launch_program(&path)
             },
-            Some(MenuCommand::Configured(args)) => {
+            Some(MenuCommand::Configured(args, cwd)) => {
                 println!("Executing command: {}", selected);
-                Self::launch_command(&args)
+                Self::launch_command(&args, cwd.as_deref())
             },
             Some(MenuCommand::KeyCombo(keys)) => {
                 println!("Executing key combination: {}", selected);
@@ -954,13 +976,23 @@ impl Menu {
         }
     }
 
-    fn launch_command(args: &[String]) -> Result<(), MenuError> {
+    fn launch_command(args: &[String], cwd: Option<&str>) -> Result<(), MenuError> {
         if args.is_empty() {
             return Err(MenuError::InvalidArguments("No command provided".to_string()));
         }
 
         let mut cmd = Command::new(&args[0]);
         cmd.args(&args[1..]);
+
+        // Per-command working directory override. A missing path is non-fatal:
+        // warn and inherit the process cwd (set globally via `cwd` at startup).
+        if let Some(dir) = cwd {
+            if Path::new(dir).is_dir() {
+                cmd.current_dir(dir);
+            } else {
+                eprintln!("Warning: cwd '{}' does not exist; running in current directory", dir);
+            }
+        }
 
         // Hide console window for these commands
         cmd.creation_flags(CREATE_NEW_PROCESS_GROUP);
@@ -1206,7 +1238,7 @@ mod tests {
         );
     }
 
-    use super::{merge_packs, read_packs, resolve_settings, MenuConfig, Pack, DEFAULT_CONFIG};
+    use super::{merge_packs, read_packs, resolve_settings, EntryStore, MenuCommand, MenuConfig, Pack, DEFAULT_CONFIG};
     use crate::theme::default_settings;
     use crate::wlines::parse_color;
 
@@ -1265,6 +1297,46 @@ mod tests {
         let def = default_settings();
         assert_eq!(settings.bg, def.bg);
         assert_eq!(settings.bg_select, def.bg_select);
+    }
+
+    #[test]
+    fn global_cwd_parses() {
+        let cfg = parse_config(r#"cwd = "D:\\work""#);
+        assert_eq!(cfg.cwd.as_deref(), Some(r"D:\work"));
+        // Absent by default so behavior is unchanged for configs without it.
+        assert!(parse_config("").cwd.is_none());
+    }
+
+    #[test]
+    fn per_command_cwd_parses_alongside_args() {
+        // `cwd` is a sibling of the flattened untagged `args`/`keys` enum; both
+        // must survive deserialization.
+        let cfg = parse_config(
+            r#"
+            [[commands]]
+            name = "Dev server"
+            args = ["npm", "start"]
+            cwd = "D:\\work\\my-project"
+
+            [[commands]]
+            name = "Maximize"
+            keys = ["WIN", "UP"]
+        "#,
+        );
+        let cmds = cfg.commands.expect("commands parse");
+        assert_eq!(cmds[0].cwd.as_deref(), Some(r"D:\work\my-project"));
+        assert!(cmds[1].cwd.is_none());
+
+        // The cwd rides along into the resolved MenuCommand.
+        let mut store = EntryStore::empty();
+        store.apply_config_commands(cmds);
+        match store.get("Dev server") {
+            Some(MenuCommand::Configured(args, cwd)) => {
+                assert_eq!(args, &["npm", "start"]);
+                assert_eq!(cwd.as_deref(), Some(r"D:\work\my-project"));
+            }
+            other => panic!("expected Configured with cwd, got {:?}", other),
+        }
     }
 
     #[test]
