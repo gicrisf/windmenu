@@ -48,6 +48,16 @@
 #
 # Or define your own [themes.<name>] with the same six keys and select it with `theme`.
 
+# --- Working Directory & Environment ---
+# Directory that launched programs (both apps and commands) run from, and
+# environment variables they inherit. Both are set once at startup; without
+# `cwd`, programs inherit windmenu's own directory. A context or command `cwd`
+# overrides the directory; a context or command `env` overrides individual
+# variables (per key). Missing cwd paths are ignored with a warning, so windmenu
+# always starts.
+# cwd = "D:\\work"
+# env = { NODE_ENV = "production" }
+
 # --- Custom Commands ---
 # Extra entries shown alongside discovered apps.
 # [[commands]]
@@ -55,5 +65,35 @@
 # args = ["wt"]           # `args` runs a program
 #
 # [[commands]]
+# name = "Dev server"
+# args = ["npm", "start"]
+# cwd  = "D:\\work\\my-project"   # run this command from a specific directory
+# env  = { PORT = "3000" }        # extra environment variables for this command
+#
+# [[commands]]
 # name = "Maximize Window"
 # keys = ["WIN", "UP"]    # `keys` simulates a keyboard shortcut.
+
+# --- Contexts ---
+# A context groups commands that share a `cwd` and `env` (and can absorb an
+# imported pack's commands). It's a shorthand — the commands appear as plain menu
+# entries, not a submenu. Precedence: command > context > global, and `env`
+# merges per key while `cwd` is replaced by the most specific one set.
+#
+# Windows note: CreateProcess can't run .bat/.ps1 directly — include the
+# interpreter, e.g. ["cmd", "/c", "dev.bat"] or ["powershell", "-File", "dev.ps1"].
+# [[contexts]]
+# name = "Frontend"                          # docs only, unused at runtime
+# cwd  = "D:\\work\\frontend"
+# env  = { NODE_ENV = "development" }
+# import = ["packs/commands/tooling.toml"]   # optional: a pack joins this context
+#
+#   [[contexts.commands]]
+#   name = "Dev server"
+#   args = ["cmd", "/c", "dev.bat"]          # scripts include their interpreter
+#
+#   [[contexts.commands]]
+#   name = "API"
+#   args = ["npm", "run", "api"]
+#   cwd  = "D:\\work\\api"                   # most specific wins
+#   env  = { PORT = "4000" }                 # merges over the context env

@@ -62,10 +62,21 @@ impl fmt::Display for MenuError {
 
 impl std::error::Error for MenuError {}
 
+/// A fully-resolved `args` command ready to spawn. `cwd`/`env` are already folded
+/// through the global > context > command precedence: `cwd` is `command.or(context)`
+/// (global is the process cwd) and `env` is the context env merged with the command
+/// env per key (global env lives in the process environment and is inherited).
+#[derive(Debug, Clone)]
+pub struct CommandSpec {
+    pub args: Vec<String>,
+    pub cwd: Option<String>,
+    pub env: HashMap<String, String>,
+}
+
 #[derive(Debug, Clone)]
 pub enum MenuCommand {
     Start(PathBuf),            // For Start menu shortcuts
-    Configured(Vec<String>, Option<String>),  // Configured command: args + optional cwd override
+    Configured(CommandSpec),   // Configured command: args + resolved cwd/env
     KeyCombo(Vec<String>),    // For key combinations like ALT+X
     ToggleCapsLock,           // For caps lock toggle
     RefreshApps,              // Rescan Start Menu and Windows Store apps
@@ -87,32 +98,71 @@ impl EntryStore {
         Self { builtins, config: HashMap::new(), dynamic: HashMap::new() }
     }
 
-    fn apply_config_commands(&mut self, cmds: Vec<CommandConfig>) {
-        let mut config = HashMap::new();
-        for cmd in cmds {
-            let cwd = cmd.cwd;
-            let (key, command) = match cmd.command_type {
-                CommandType::Args { args } => (cmd.name, MenuCommand::Configured(args, cwd)),
-                CommandType::Keys { keys } => {
-                    let key_sequence = keys.join(", ");
-                    let formatted_key = format!("{} [{}]", cmd.name, key_sequence);
-                    (formatted_key, MenuCommand::KeyCombo(keys))
-                }
-            };
-            config.insert(key, command);
+    /// Rebuild the config layer from root commands, top-level import commands, and
+    /// contexts. Flatten order (last wins on a name clash): top-level imports →
+    /// context imports → context inline commands → root `[[commands]]`. Each command's
+    /// `cwd`/`env` is resolved against its context (`command.or(context)` for cwd, a
+    /// per-key merge with the command winning for env); global cwd/env are the process
+    /// base applied in `Menu::new`, not here. Returns context-import warnings.
+    fn apply_config(
+        &mut self,
+        root_commands: Option<Vec<CommandConfig>>,
+        import_commands: Vec<CommandConfig>,
+        contexts: Option<Vec<ContextConfig>>,
+        base_dir: &Path,
+    ) -> Vec<String> {
+        let mut config: HashMap<String, MenuCommand> = HashMap::new();
+        let mut warnings = Vec::new();
+        let empty_env = HashMap::new();
+
+        // 1. Top-level imports — no context cwd/env.
+        for cmd in import_commands {
+            insert_command(&mut config, cmd, None, &empty_env);
         }
+
+        // 2 & 3. Contexts — imported pack commands then inline commands, both
+        // inheriting the context's cwd/env.
+        if let Some(contexts) = contexts {
+            for ctx in contexts {
+                let ctx_env = ctx.env.unwrap_or_default();
+                let ctx_cwd = ctx.cwd.as_deref();
+                if let Some(imports) = ctx.import {
+                    let (mut packs, w) = read_packs(&imports, base_dir);
+                    warnings.extend(w);
+                    for pack in &mut packs {
+                        if let Some(cmds) = pack.commands.take() {
+                            for cmd in cmds {
+                                insert_command(&mut config, cmd, ctx_cwd, &ctx_env);
+                            }
+                        }
+                    }
+                }
+                if let Some(cmds) = ctx.commands {
+                    for cmd in cmds {
+                        insert_command(&mut config, cmd, ctx_cwd, &ctx_env);
+                    }
+                }
+            }
+        }
+
+        // 4. Root commands — win over everything above on a name clash.
+        if let Some(cmds) = root_commands {
+            for cmd in cmds {
+                insert_command(&mut config, cmd, None, &empty_env);
+            }
+        }
+
         self.config = config;
+        warnings
     }
 
-    pub(crate)     fn reload_config(&mut self) {
-        if let Ok((cfg, _dir, warnings)) = load_with_imports() {
+    pub(crate) fn reload_config(&mut self) {
+        if let Ok((cfg, config_dir, import_cmds, warnings)) = load_with_imports() {
             for warning in warnings {
                 eprintln!("Warning: {}", warning);
             }
-            if let Some(cmds) = cfg.commands {
-                self.apply_config_commands(cmds);
-            } else {
-                self.config.clear();
+            for warning in self.apply_config(cfg.commands, import_cmds, cfg.contexts, &config_dir) {
+                eprintln!("Warning: {}", warning);
             }
         }
     }
@@ -325,11 +375,20 @@ struct MenuConfig {
     themes: Option<HashMap<String, Palette>>,
 
     // Working directory launched programs inherit. Set once at startup via
-    // env::set_current_dir; a per-command `cwd` overrides it. Missing path warns
-    // and is ignored (keeps the current directory).
+    // env::set_current_dir; a context or command `cwd` overrides it. Missing path
+    // warns and is ignored (keeps the current directory).
     cwd: Option<String>,
 
+    // Process-wide environment variables, set once at startup via env::set_var so
+    // every child (apps and commands) inherits them; a context or command `env`
+    // overrides individual keys.
+    env: Option<HashMap<String, String>>,
+
     commands: Option<Vec<CommandConfig>>,
+
+    // Command groups sharing a cwd/env (and optionally absorbing an imported
+    // pack's commands). Flattened into plain menu entries — not a submenu.
+    contexts: Option<Vec<ContextConfig>>,
 
     // Extra theme/command packs pulled in from other TOML files (paths relative
     // to this config's directory). Non-recursive: packs cannot import further.
@@ -346,20 +405,15 @@ struct Pack {
     commands: Option<Vec<CommandConfig>>,
 }
 
-/// Fold imported packs into the root config. Root config wins over imports, and
-/// among imports the later one wins — for both themes (merged by name) and
-/// commands. Command name-dedupe happens for free in `apply_config_commands`
-/// (its `HashMap` is last-write-wins), so we only order the vec: imports first,
-/// root last.
+/// Fold imported packs' **themes** into the root config. Root config wins over
+/// imports, and among imports the later one wins (merged by name). Pack *commands*
+/// are handled separately by `apply_config`, which orders top-level imports below
+/// contexts and root commands — so they are not merged here.
 fn merge_packs(cfg: &mut MenuConfig, packs: Vec<Pack>) {
     let mut themes: HashMap<String, Palette> = HashMap::new();
-    let mut commands: Vec<CommandConfig> = Vec::new();
     for pack in packs {
         if let Some(t) = pack.themes {
             themes.extend(t); // later import overwrites earlier
-        }
-        if let Some(c) = pack.commands {
-            commands.extend(c);
         }
     }
     if let Some(root_themes) = cfg.themes.take() {
@@ -367,12 +421,6 @@ fn merge_packs(cfg: &mut MenuConfig, packs: Vec<Pack>) {
     }
     if !themes.is_empty() {
         cfg.themes = Some(themes);
-    }
-    if let Some(root_commands) = cfg.commands.take() {
-        commands.extend(root_commands); // root applied last -> wins in the HashMap
-    }
-    if !commands.is_empty() {
-        cfg.commands = Some(commands);
     }
 }
 
@@ -394,17 +442,25 @@ fn read_packs(imports: &[String], base_dir: &Path) -> (Vec<Pack>, Vec<String>) {
     (packs, warnings)
 }
 
-/// Load the root config and merge any `import`ed packs into it. Returns the
-/// merged config, its directory, and any non-fatal import warnings.
-fn load_with_imports() -> Result<(MenuConfig, PathBuf, Vec<String>), MenuError> {
+/// Load the root config and merge any top-level `import`ed packs into it. Returns
+/// the config (with pack *themes* merged in), its directory, the top-level import
+/// *commands* (kept separate so `apply_config` can order them below contexts and
+/// root commands), and any non-fatal import warnings.
+fn load_with_imports() -> Result<(MenuConfig, PathBuf, Vec<CommandConfig>, Vec<String>), MenuError> {
     let (mut cfg, config_dir) = MenuConfig::load()?;
     let mut warnings = Vec::new();
+    let mut import_commands = Vec::new();
     if let Some(imports) = cfg.import.take() {
-        let (packs, w) = read_packs(&imports, &config_dir);
+        let (mut packs, w) = read_packs(&imports, &config_dir);
         warnings = w;
+        for pack in &mut packs {
+            if let Some(cmds) = pack.commands.take() {
+                import_commands.extend(cmds); // later import wins in apply_config's map
+            }
+        }
         merge_packs(&mut cfg, packs);
     }
-    Ok((cfg, config_dir, warnings))
+    Ok((cfg, config_dir, import_commands, warnings))
 }
 
 /// Resolve a loaded config into renderer settings, starting from the built-in
@@ -607,6 +663,15 @@ pub fn config_diagnostics() {
                     }
                     merge_packs(&mut cfg, packs);
                 }
+                if let Some(contexts) = cfg.contexts.take() {
+                    for ctx in &contexts {
+                        let label = ctx.name.as_deref().unwrap_or("(unnamed)");
+                        for rel in ctx.import.iter().flatten() {
+                            let ip = base_dir.join(rel);
+                            println!("Context '{}' import ({}): {}", label, ip.display(), if ip.exists() { "found" } else { "not found" });
+                        }
+                    }
+                }
                 let (_, warnings) = resolve_settings(&cfg);
                 for warning in warnings {
                     println!("Warning: {}", warning);
@@ -747,9 +812,10 @@ fn split_command(command: &str) -> Vec<String> {
 #[derive(Debug, Deserialize)]
 struct CommandConfig {
     name: String,
-    // Optional working directory for this command only, overriding the global
-    // `cwd`. Applies to `args` commands; ignored for `keys`.
+    // Working directory / environment for this command only, overriding the
+    // global and any context. Apply to `args` commands; ignored for `keys`.
     cwd: Option<String>,
+    env: Option<HashMap<String, String>>,
     #[serde(flatten)]
     command_type: CommandType,
 }
@@ -759,6 +825,47 @@ struct CommandConfig {
 enum CommandType {
     Args { args: Vec<String> },
     Keys { keys: Vec<String> },
+}
+
+/// A `[[contexts]]` block: a group of commands sharing a `cwd`/`env`, optionally
+/// absorbing an imported pack's commands. Purely a config shorthand — it flattens
+/// into plain menu entries, so the renderer/EntryStore never see it as a submenu.
+#[derive(Debug, Deserialize)]
+struct ContextConfig {
+    #[allow(dead_code)] // documentation only; not used at runtime
+    name: Option<String>,
+    cwd: Option<String>,
+    env: Option<HashMap<String, String>>,
+    commands: Option<Vec<CommandConfig>>,
+    import: Option<Vec<String>>,
+}
+
+/// Resolve one `CommandConfig` against its context's cwd/env and insert it into the
+/// config map. `args` commands become a `Configured` `CommandSpec`: cwd is
+/// `command.or(context)`, env is `context` merged with `command` per key (command
+/// wins). `keys` commands become a `KeyCombo` and ignore cwd/env — they don't spawn
+/// a process. A later insert with the same map key wins (name-collision precedence).
+fn insert_command(
+    config: &mut HashMap<String, MenuCommand>,
+    cmd: CommandConfig,
+    ctx_cwd: Option<&str>,
+    ctx_env: &HashMap<String, String>,
+) {
+    match cmd.command_type {
+        CommandType::Args { args } => {
+            let cwd = cmd.cwd.or_else(|| ctx_cwd.map(str::to_string));
+            let mut env = ctx_env.clone();
+            if let Some(cmd_env) = cmd.env {
+                env.extend(cmd_env); // command overrides context per key
+            }
+            config.insert(cmd.name, MenuCommand::Configured(CommandSpec { args, cwd, env }));
+        }
+        CommandType::Keys { keys } => {
+            let key_sequence = keys.join(", ");
+            let formatted_key = format!("{} [{}]", cmd.name, key_sequence);
+            config.insert(formatted_key, MenuCommand::KeyCombo(keys));
+        }
+    }
 }
 
 pub struct Menu {
@@ -817,7 +924,7 @@ impl Menu {
         let mut history_enabled = true;
         let mut history_dir: Option<PathBuf> = None;
 
-        if let Ok((cfg, config_dir, import_warnings)) = load_with_imports() {
+        if let Ok((cfg, config_dir, import_commands, import_warnings)) = load_with_imports() {
             let (resolved, warnings) = resolve_settings(&cfg);
             settings = resolved;
             for warning in import_warnings.iter().chain(warnings.iter()) {
@@ -826,14 +933,10 @@ impl Menu {
             if let Some(ref keys) = &cfg.hotkey {
                 hotkey.keys = keys.clone();
             }
-            if let Some(cmds) = cfg.commands {
-                entries.write().unwrap().apply_config_commands(cmds);
-            }
             history_enabled = cfg.history.unwrap_or(true);
-            history_dir = Some(config_dir);
 
             // Global working directory for launched programs. The config is
-            // already resolved (via load_with_imports above) and history_dir is
+            // already resolved (via load_with_imports above) and config_dir is
             // absolute, so changing the process cwd now is safe. Every child
             // (ShellExecuteW shortcuts, CreateProcess commands) inherits it; a
             // missing path warns and is ignored so the launcher still starts.
@@ -844,6 +947,26 @@ impl Menu {
                     eprintln!("Warning: failed to set cwd '{}': {}", dir, e);
                 }
             }
+
+            // Global environment: set process-wide so every child (apps and
+            // commands) inherits it. Contexts and commands layer over these via
+            // CommandSpec.env; keys not overridden there stay at the global value.
+            if let Some(env_vars) = &cfg.env {
+                for (k, v) in env_vars {
+                    env::set_var(k, v);
+                }
+            }
+
+            // Flatten commands + contexts into the config layer (resolves each
+            // command's cwd/env against its context). Context-import warnings are
+            // surfaced like any other.
+            let ctx_warnings = entries.write().unwrap().apply_config(
+                cfg.commands, import_commands, cfg.contexts, &config_dir,
+            );
+            for warning in ctx_warnings {
+                eprintln!("Warning: {}", warning);
+            }
+            history_dir = Some(config_dir);
         }
 
         // The history file lives next to the config; with no config it sits
@@ -914,9 +1037,9 @@ impl Menu {
                 println!("Executing Start command: {}", selected);
                 Self::launch_program(&path)
             },
-            Some(MenuCommand::Configured(args, cwd)) => {
+            Some(MenuCommand::Configured(spec)) => {
                 println!("Executing command: {}", selected);
-                Self::launch_command(&args, cwd.as_deref())
+                Self::launch_command(&spec)
             },
             Some(MenuCommand::KeyCombo(keys)) => {
                 println!("Executing key combination: {}", selected);
@@ -976,22 +1099,28 @@ impl Menu {
         }
     }
 
-    fn launch_command(args: &[String], cwd: Option<&str>) -> Result<(), MenuError> {
-        if args.is_empty() {
+    fn launch_command(spec: &CommandSpec) -> Result<(), MenuError> {
+        if spec.args.is_empty() {
             return Err(MenuError::InvalidArguments("No command provided".to_string()));
         }
 
-        let mut cmd = Command::new(&args[0]);
-        cmd.args(&args[1..]);
+        let mut cmd = Command::new(&spec.args[0]);
+        cmd.args(&spec.args[1..]);
 
-        // Per-command working directory override. A missing path is non-fatal:
-        // warn and inherit the process cwd (set globally via `cwd` at startup).
-        if let Some(dir) = cwd {
+        // Resolved working directory (command-or-context; global is the process
+        // cwd). A missing path is non-fatal: warn and inherit the process cwd.
+        if let Some(dir) = spec.cwd.as_deref() {
             if Path::new(dir).is_dir() {
                 cmd.current_dir(dir);
             } else {
                 eprintln!("Warning: cwd '{}' does not exist; running in current directory", dir);
             }
+        }
+
+        // Resolved environment (context + command overrides). Global env is already
+        // in the process environment and inherited; these override individual keys.
+        if !spec.env.is_empty() {
+            cmd.envs(&spec.env);
         }
 
         // Hide console window for these commands
@@ -1307,10 +1436,28 @@ mod tests {
         assert!(parse_config("").cwd.is_none());
     }
 
+    /// Flatten a parsed config into an EntryStore the way `Menu::new` does, with no
+    /// top-level import commands. Panics on context-import warnings (tests that want
+    /// them call `apply_config` directly).
+    fn resolve_commands(cfg: MenuConfig) -> EntryStore {
+        let mut store = EntryStore::empty();
+        let w = store.apply_config(cfg.commands, Vec::new(), cfg.contexts, std::path::Path::new("."));
+        assert!(w.is_empty(), "unexpected context warnings: {:?}", w);
+        store
+    }
+
+    /// Fetch a resolved `args` command's spec by menu name, failing otherwise.
+    fn spec<'a>(store: &'a EntryStore, name: &str) -> &'a super::CommandSpec {
+        match store.get(name) {
+            Some(MenuCommand::Configured(spec)) => spec,
+            other => panic!("expected Configured for '{}', got {:?}", name, other),
+        }
+    }
+
     #[test]
     fn per_command_cwd_parses_alongside_args() {
-        // `cwd` is a sibling of the flattened untagged `args`/`keys` enum; both
-        // must survive deserialization.
+        // `cwd`/`env` are siblings of the flattened untagged `args`/`keys` enum;
+        // all must survive deserialization.
         let cfg = parse_config(
             r#"
             [[commands]]
@@ -1323,20 +1470,212 @@ mod tests {
             keys = ["WIN", "UP"]
         "#,
         );
-        let cmds = cfg.commands.expect("commands parse");
+        let cmds = cfg.commands.as_ref().expect("commands parse");
         assert_eq!(cmds[0].cwd.as_deref(), Some(r"D:\work\my-project"));
         assert!(cmds[1].cwd.is_none());
 
-        // The cwd rides along into the resolved MenuCommand.
-        let mut store = EntryStore::empty();
-        store.apply_config_commands(cmds);
-        match store.get("Dev server") {
-            Some(MenuCommand::Configured(args, cwd)) => {
-                assert_eq!(args, &["npm", "start"]);
-                assert_eq!(cwd.as_deref(), Some(r"D:\work\my-project"));
-            }
-            other => panic!("expected Configured with cwd, got {:?}", other),
+        // The cwd rides along into the resolved CommandSpec.
+        let store = resolve_commands(cfg);
+        let s = spec(&store, "Dev server");
+        assert_eq!(s.args, &["npm", "start"]);
+        assert_eq!(s.cwd.as_deref(), Some(r"D:\work\my-project"));
+    }
+
+    #[test]
+    fn global_env_parses() {
+        let cfg = parse_config(r#"env = { NODE_ENV = "production" }"#);
+        let env = cfg.env.expect("env parses");
+        assert_eq!(env.get("NODE_ENV").map(String::as_str), Some("production"));
+        assert!(parse_config("").env.is_none());
+    }
+
+    #[test]
+    fn per_command_env_parses_alongside_args() {
+        let cfg = parse_config(
+            r#"
+            [[commands]]
+            name = "Plain command"
+            args = ["echo", "hi"]
+            env = { FOO = "bar" }
+        "#,
+        );
+        let store = resolve_commands(cfg);
+        let s = spec(&store, "Plain command");
+        assert_eq!(s.env.get("FOO").map(String::as_str), Some("bar"));
+    }
+
+    #[test]
+    fn context_cwd_and_env_fill_where_command_lacks_them() {
+        let cfg = parse_config(
+            r#"
+            [[contexts]]
+            name = "Frontend"
+            cwd = "D:\\work\\frontend"
+            env = { NODE_ENV = "development" }
+
+              [[contexts.commands]]
+              name = "Run tests"
+              args = ["npm", "test"]
+        "#,
+        );
+        let store = resolve_commands(cfg);
+        let s = spec(&store, "Run tests");
+        assert_eq!(s.cwd.as_deref(), Some(r"D:\work\frontend"));
+        assert_eq!(s.env.get("NODE_ENV").map(String::as_str), Some("development"));
+    }
+
+    #[test]
+    fn command_cwd_beats_context_cwd() {
+        let cfg = parse_config(
+            r#"
+            [[contexts]]
+            cwd = "D:\\work\\frontend"
+
+              [[contexts.commands]]
+              name = "API"
+              args = ["npm", "run", "api"]
+              cwd = "D:\\work\\api"
+        "#,
+        );
+        let store = resolve_commands(cfg);
+        assert_eq!(spec(&store, "API").cwd.as_deref(), Some(r"D:\work\api"));
+    }
+
+    #[test]
+    fn env_merges_per_key_command_wins() {
+        // The command overrides PORT but inherits the context's NODE_ENV.
+        let cfg = parse_config(
+            r#"
+            [[contexts]]
+            env = { NODE_ENV = "development", PORT = "3000" }
+
+              [[contexts.commands]]
+              name = "API"
+              args = ["npm", "run", "api"]
+              env = { PORT = "4000" }
+        "#,
+        );
+        let store = resolve_commands(cfg);
+        let s = spec(&store, "API");
+        assert_eq!(s.env.get("NODE_ENV").map(String::as_str), Some("development"));
+        assert_eq!(s.env.get("PORT").map(String::as_str), Some("4000"));
+    }
+
+    #[test]
+    fn keys_command_ignores_cwd_and_env() {
+        // A `keys` command carries no CommandSpec, so cwd/env simply don't apply.
+        let cfg = parse_config(
+            r#"
+            [[contexts]]
+            cwd = "D:\\work"
+            env = { FOO = "bar" }
+
+              [[contexts.commands]]
+              name = "Maximize"
+              keys = ["WIN", "UP"]
+        "#,
+        );
+        let store = resolve_commands(cfg);
+        match store.get("Maximize [WIN, UP]") {
+            Some(MenuCommand::KeyCombo(keys)) => assert_eq!(keys, &["WIN", "UP"]),
+            other => panic!("expected KeyCombo, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn context_parses_all_fields() {
+        let cfg = parse_config(
+            r#"
+            [[contexts]]
+            name = "Frontend"
+            cwd = "D:\\work\\frontend"
+            env = { NODE_ENV = "development" }
+            import = ["packs/commands/tooling.toml"]
+
+              [[contexts.commands]]
+              name = "Dev server"
+              args = ["cmd", "/c", "dev.bat"]
+        "#,
+        );
+        let ctx = &cfg.contexts.expect("contexts parse")[0];
+        assert_eq!(ctx.name.as_deref(), Some("Frontend"));
+        assert_eq!(ctx.cwd.as_deref(), Some(r"D:\work\frontend"));
+        assert_eq!(ctx.env.as_ref().unwrap().get("NODE_ENV").map(String::as_str), Some("development"));
+        assert_eq!(ctx.import.as_ref().unwrap(), &["packs/commands/tooling.toml"]);
+        assert_eq!(ctx.commands.as_ref().unwrap()[0].name, "Dev server");
+    }
+
+    #[test]
+    fn root_command_beats_context_command_on_name_clash() {
+        // Flatten order: contexts before root, so root wins the map.
+        let cfg = parse_config(
+            r#"
+            [[contexts]]
+            cwd = "D:\\ctx"
+              [[contexts.commands]]
+              name = "X"
+              args = ["ctx"]
+
+            [[commands]]
+            name = "X"
+            args = ["root"]
+        "#,
+        );
+        let store = resolve_commands(cfg);
+        let s = spec(&store, "X");
+        assert_eq!(s.args, &["root"]);
+        assert!(s.cwd.is_none()); // root command has no cwd; context cwd didn't leak
+    }
+
+    #[test]
+    fn context_import_pulls_pack_commands_with_inherited_cwd_env() {
+        let dir = std::env::temp_dir();
+        let name = format!("windmenu-ctx-pack-{}.toml", std::process::id());
+        let path = dir.join(&name);
+        std::fs::write(&path, "[[commands]]\nname = \"Tool\"\nargs = [\"tool\"]\n").unwrap();
+
+        let cfg = parse_config(&format!(
+            r#"
+            [[contexts]]
+            cwd = "D:\\work"
+            env = {{ NODE_ENV = "development" }}
+            import = ["{}"]
+        "#,
+            name
+        ));
+        let mut store = EntryStore::empty();
+        let w = store.apply_config(cfg.commands, Vec::new(), cfg.contexts, &dir);
+        let _ = std::fs::remove_file(&path);
+        assert!(w.is_empty(), "unexpected warnings: {:?}", w);
+
+        let s = spec(&store, "Tool");
+        assert_eq!(s.args, &["tool"]);
+        assert_eq!(s.cwd.as_deref(), Some(r"D:\work"));
+        assert_eq!(s.env.get("NODE_ENV").map(String::as_str), Some("development"));
+    }
+
+    #[test]
+    fn missing_context_import_warns_and_skips() {
+        let cfg = parse_config(
+            r#"
+            [[contexts]]
+            import = ["nope.toml"]
+        "#,
+        );
+        let mut store = EntryStore::empty();
+        let w = store.apply_config(cfg.commands, Vec::new(), cfg.contexts, std::path::Path::new("."));
+        assert_eq!(w.len(), 1);
+        assert!(w[0].contains("not found"));
+    }
+
+    #[test]
+    fn pack_ignores_contexts() {
+        // A pack contributes only themes/commands; a stray [[contexts]] is dropped.
+        let pack = parse_pack(
+            "[[contexts]]\nname = \"nope\"\n[themes.z]\nfg = \"#ffffff\"\n[[commands]]\nname = \"C\"\nargs = [\"c\"]\n",
+        );
+        assert!(pack.themes.as_ref().unwrap().contains_key("z"));
+        assert_eq!(pack.commands.as_ref().unwrap()[0].name, "C");
     }
 
     #[test]
@@ -1439,13 +1778,24 @@ mod tests {
     }
 
     #[test]
-    fn merge_packs_commands_imports_before_root() {
+    fn merge_packs_ignores_commands() {
+        // Command merging moved to apply_config; merge_packs handles themes only.
         let mut cfg = parse_config("[[commands]]\nname = \"Root\"\nargs = [\"r\"]\n");
         let pack = parse_pack("[[commands]]\nname = \"Pack\"\nargs = [\"p\"]\n");
         merge_packs(&mut cfg, vec![pack]);
         let names: Vec<&str> = cfg.commands.as_ref().unwrap().iter().map(|c| c.name.as_str()).collect();
-        // Imports first, root last — so root wins a name clash in apply_config_commands.
-        assert_eq!(names, vec!["Pack", "Root"]);
+        assert_eq!(names, vec!["Root"]);
+    }
+
+    #[test]
+    fn root_command_beats_top_level_import_on_name_clash() {
+        // apply_config inserts top-level imports first, root last, so root wins.
+        let mut import_pack = parse_pack("[[commands]]\nname = \"X\"\nargs = [\"import\"]\n");
+        let import_cmds = import_pack.commands.take().unwrap();
+        let cfg = parse_config("[[commands]]\nname = \"X\"\nargs = [\"root\"]\n");
+        let mut store = EntryStore::empty();
+        store.apply_config(cfg.commands, import_cmds, None, std::path::Path::new("."));
+        assert_eq!(spec(&store, "X").args, &["root"]);
     }
 
     #[test]
