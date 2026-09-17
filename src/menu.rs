@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -165,8 +165,76 @@ pub struct Hotkey {
     keys: Vec<String>,
 }
 
+/// Activation hotkey used when the config doesn't specify one.
+const DEFAULT_HOTKEY: [&str; 3] = ["CTRL", "ALT", "SPACE"];
+
+/// The config as read from disk. Built exactly once per process by [`config`].
+pub struct LoadedConfig {
+    config: MenuConfig,
+    dir: PathBuf,
+    warnings: Vec<String>,
+}
+
+impl LoadedConfig {
+    /// Human-readable form of the activation hotkey (e.g. "Ctrl+Alt+Space").
+    pub fn hotkey_display(&self) -> String {
+        Hotkey::from_config(self.config.hotkey.as_deref()).display()
+    }
+}
+
+/// Process-wide config cache: the file (and its imports) is read from disk on
+/// the first call and never again. `None` means "no usable config", in which
+/// case callers fall back to the built-in defaults.
+static CONFIG: OnceLock<Option<LoadedConfig>> = OnceLock::new();
+
+pub fn config() -> Option<&'static LoadedConfig> {
+    CONFIG
+        .get_or_init(|| {
+            load_with_imports()
+                .ok()
+                .map(|(config, dir, warnings)| LoadedConfig { config, dir, warnings })
+        })
+        .as_ref()
+}
+
+/// Human-readable activation hotkey, defaults included.
+pub fn hotkey_display() -> String {
+    match config() {
+        Some(loaded) => loaded.hotkey_display(),
+        None => Hotkey::from_config(None).display(),
+    }
+}
+
 impl Hotkey {
     const HOTKEY_ID: i32 = 1;
+
+    /// Configured keys, or the default combo when unset.
+    fn from_config(keys: Option<&[String]>) -> Hotkey {
+        Hotkey {
+            keys: match keys {
+                Some(keys) => keys.to_vec(),
+                None => DEFAULT_HOTKEY.iter().map(|k| k.to_string()).collect(),
+            },
+        }
+    }
+
+    /// "CTRL", "ALT", "SPACE" -> "Ctrl+Alt+Space"
+    pub fn display(&self) -> String {
+        self.keys
+            .iter()
+            .map(|key| {
+                let mut chars = key.chars();
+                match chars.next() {
+                    Some(first) => {
+                        first.to_uppercase().collect::<String>()
+                            + &chars.as_str().to_lowercase()
+                    }
+                    None => String::new(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("+")
+    }
 
     /// Map the configured keys to a RegisterHotKey (modifiers, vk) pair.
     /// Valid combos are any number of modifiers (WIN/CTRL/ALT/SHIFT) plus
@@ -738,14 +806,14 @@ fn split_command(command: &str) -> Vec<String> {
 }
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct CommandConfig {
     name: String,
     #[serde(flatten)]
     command_type: CommandType,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 enum CommandType {
     Args { args: Vec<String> },
@@ -796,32 +864,30 @@ fn find_lnk_files(dir: &Path) -> std::io::Result<HashMap<String, PathBuf>> {
 
 
 impl Menu {
+    /// Build the menu from the process-wide config cache (see [`config`]), so
+    /// no file is read here if it was already read for e.g. the startup banner.
     pub fn new() -> Menu {
         let process_running = AtomicBool::new(false);
 
-        // Ctrl+Alt+Space
-        let mut hotkey = Hotkey {
-            keys: vec!["CTRL".to_string(), "ALT".to_string(), "SPACE".to_string()],
-        };
+        let mut hotkey = Hotkey::from_config(None); // Ctrl+Alt+Space
         let mut settings = theme::default_settings();
         let entries = Arc::new(RwLock::new(EntryStore::empty()));
         let mut history_enabled = true;
         let mut history_dir: Option<PathBuf> = None;
 
-        if let Ok((cfg, config_dir, import_warnings)) = load_with_imports() {
-            let (resolved, warnings) = resolve_settings(&cfg);
+        if let Some(loaded) = config() {
+            let cfg = &loaded.config;
+            let (resolved, warnings) = resolve_settings(cfg);
             settings = resolved;
-            for warning in import_warnings.iter().chain(warnings.iter()) {
+            for warning in loaded.warnings.iter().chain(warnings.iter()) {
                 eprintln!("Warning: {}", warning);
             }
-            if let Some(ref keys) = &cfg.hotkey {
-                hotkey.keys = keys.clone();
-            }
-            if let Some(cmds) = cfg.commands {
+            hotkey = Hotkey::from_config(cfg.hotkey.as_deref());
+            if let Some(cmds) = cfg.commands.clone() {
                 entries.write().unwrap().apply_config_commands(cmds);
             }
             history_enabled = cfg.history.unwrap_or(true);
-            history_dir = Some(config_dir);
+            history_dir = Some(loaded.dir.clone());
         }
 
         // The history file lives next to the config; with no config it sits
