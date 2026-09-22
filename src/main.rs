@@ -262,7 +262,7 @@ fn start_daemon(daemon: &WindmenuDaemon) {
     match daemon.start() {
         Ok(()) => {
             println!("windmenu is now running in the background");
-            println!("Press Ctrl+Alt+Space to activate menu");
+            println!("Press {} to activate menu", menu::hotkey_display());
             println!("Use 'windmenu stop' to stop the daemon");
         }
         Err(DaemonError::AlreadyRunning) => {
@@ -293,7 +293,7 @@ fn restart_daemon(daemon: &WindmenuDaemon) {
     match daemon.restart() {
         Ok(()) => {
             println!("windmenu daemon restarted successfully");
-            println!("Press Ctrl+Alt+Space to activate menu");
+            println!("Press {} to activate menu", menu::hotkey_display());
         }
         Err(err) => {
             eprintln!("Failed to restart windmenu daemon: {}", err);
