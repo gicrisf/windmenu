@@ -6,11 +6,13 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::process::{Command, Stdio};
 use std::thread;
+use std::time::{Duration, Instant};
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::process::CommandExt;
 use std::fmt;
 use serde::Deserialize;
+use winapi::shared::winerror::ERROR_HOTKEY_ALREADY_REGISTERED;
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::shellapi::ShellExecuteW;
 use winapi::um::winuser::{
@@ -26,7 +28,7 @@ use winapi::um::winuser::{
 };
 use winapi::um::winbase::{CREATE_NEW_PROCESS_GROUP, INFINITE, WAIT_OBJECT_0};
 use winapi::um::handleapi::CloseHandle;
-use winapi::um::synchapi::CreateEventW;
+use winapi::um::synchapi::{CreateEventW, WaitForSingleObject};
 
 use crate::apps::{find_reparse_points, get_windows_apps_path};
 use crate::history::{History, HISTORY_FILE};
@@ -208,8 +210,10 @@ impl Hotkey {
     /// Wait for hotkey activations via RegisterHotKey, invoking `callback`
     /// on each WM_HOTKEY. Event-driven: the thread sleeps in GetMessageW,
     /// so idle CPU cost is zero and presses can't be missed or repeated
-    /// (MOD_NOREPEAT). Fatal errors are shown in a message box because the
-    /// detached daemon has no visible stderr.
+    /// (MOD_NOREPEAT). A hotkey already held by another app at boot is retried
+    /// for a minute; the shutdown event is created first so `windmenu stop`
+    /// can interrupt that wait. Other errors are fatal and shown in a message
+    /// box because the detached daemon has no visible stderr.
     pub fn listen<F>(&self, mut callback: F)
     where
         F: FnMut(),
@@ -219,16 +223,6 @@ impl Hotkey {
         });
 
         unsafe {
-            if RegisterHotKey(std::ptr::null_mut(), Self::HOTKEY_ID, modifiers, vk) == 0 {
-                Self::fatal(&format!(
-                    "Failed to register hotkey {} (error {}). \
-                     Another application may already use this combo; \
-                     change 'hotkey' in windmenu.toml.",
-                    self.keys.join("+"),
-                    GetLastError()
-                ));
-            }
-
             let event_name: Vec<u16> = "windmenu-shutdown-event\0".encode_utf16().collect();
             let shutdown_event = CreateEventW(
                 std::ptr::null_mut(),
@@ -238,6 +232,29 @@ impl Hotkey {
             );
             if shutdown_event.is_null() {
                 Self::fatal("Failed to create shutdown event");
+            }
+
+            let deadline = Instant::now() + Duration::from_secs(60);
+            loop {
+                if RegisterHotKey(std::ptr::null_mut(), Self::HOTKEY_ID, modifiers, vk) != 0 {
+                    break;
+                }
+                let error = GetLastError();
+                if error != ERROR_HOTKEY_ALREADY_REGISTERED || Instant::now() >= deadline {
+                    CloseHandle(shutdown_event);
+                    Self::fatal(&format!(
+                        "Failed to register hotkey {} (error {}). \
+                         Another application may already use this combo; \
+                         change 'hotkey' in windmenu.toml.",
+                        self.keys.join("+"),
+                        error
+                    ));
+                }
+                // Stop may arrive while this app is still releasing the combo.
+                if WaitForSingleObject(shutdown_event, 1000) == WAIT_OBJECT_0 {
+                    CloseHandle(shutdown_event);
+                    return;
+                }
             }
 
             println!("Hotkey registered ({})", self.keys.join("+"));
