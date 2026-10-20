@@ -6,8 +6,11 @@
 //! "enabled"/"not set" and "yes"/"no", full paths via `.display()`.
 
 use std::env;
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
+
+use winapi::um::winbase::CREATE_NO_WINDOW;
 
 // use crate::apps; // re-enable with the Windows Store app count at the end of run()
 use crate::daemon::WindmenuDaemon;
@@ -229,6 +232,7 @@ fn probe_task() -> Option<TaskInfo> {
         let target = format!("{}{}", path, name);
         let output = Command::new("schtasks")
             .args(["/query", "/tn", &target, "/xml"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .ok()?;
         if !output.status.success() {
