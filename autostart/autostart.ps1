@@ -76,19 +76,32 @@ function Remove-RunKey {
 
 # Task Scheduler names are per-folder. Remove the task from one or both known
 # paths; $null means both (used when switching methods and on disable).
+function Remove-TaskAt {
+    param([string]$Name, [string]$Path)
+    $task = $null
+    try {
+        $task = Get-ScheduledTask -TaskName $Name -TaskPath $Path -ErrorAction Stop
+    } catch {
+        # Missing folder or no permission to read it: nothing to remove.
+    }
+    if ($task) {
+        Unregister-ScheduledTask -TaskName $Name -TaskPath $Path -Confirm:$false | Out-Null
+        return $true
+    }
+    return $false
+}
+
 function Remove-Task {
     param([string[]]$Paths = @($TaskFolder, '\'))
     $removed = $false
     foreach ($path in $Paths) {
-        $task = $null
-        try {
-            $task = Get-ScheduledTask -TaskName $TaskName -TaskPath $path -ErrorAction Stop
-        } catch {
-            # Missing folder or no permission to read it: nothing to remove.
-        }
-        if ($task) {
-            Unregister-ScheduledTask -TaskName $TaskName -TaskPath $path -Confirm:$false | Out-Null
-            $removed = $true
+        if (Remove-TaskAt $TaskName $path) { $removed = $true }
+    }
+    # Old releases wrote root tasks named "windmenu" (NSIS) or
+    # "windmenu-daemon" (Rust CLI). Clear them on enable/disable.
+    foreach ($legacy in @('windmenu-daemon', 'windmenu')) {
+        foreach ($path in @($TaskFolder, '\')) {
+            if (Remove-TaskAt $legacy $path) { $removed = $true }
         }
     }
     return $removed
