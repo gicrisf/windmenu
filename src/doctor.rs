@@ -7,6 +7,7 @@
 
 use std::env;
 use std::path::PathBuf;
+use std::process::Command;
 
 // use crate::apps; // re-enable with the Windows Store app count at the end of run()
 use crate::daemon::WindmenuDaemon;
@@ -16,6 +17,21 @@ use crate::menu;
 /// (`autostart/autostart.ps1`). Probed read-only.
 const RUN_VALUE_NAME: &str = "WindmenuDaemon";
 const RUN_SUBKEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+
+/// Scheduled task written by `autostart.ps1 enable -Method Task`. The task is
+/// per-user and lives in the `\Windmenu\` folder, or in the root folder when
+/// the folder cannot be created. Probed read-only with `schtasks`.
+const TASK_FOLDER: &str = "\\Windmenu\\";
+const TASK_ROOT: &str = "\\";
+const SUPERVISOR_MUTEX: &str = "windmenu-supervisor-mutex";
+
+struct TaskInfo {
+    path: String,
+    name: String,
+    command: String,
+    arguments: String,
+    delay: String,
+}
 
 pub fn run(daemon: &WindmenuDaemon) {
     println!("Config");
@@ -33,13 +49,46 @@ pub fn run(daemon: &WindmenuDaemon) {
     }
     println!();
 
-    println!("Daemon: {}", if daemon.is_running() { "running" } else { "not running" });
+    let daemon_running = daemon.is_running();
+    println!("Daemon: {}", if daemon_running { "running" } else { "not running" });
+    let supervised = supervisor_running();
+    println!("Supervisor: {}", if supervised { "running" } else { "not running" });
+    if supervised && !daemon_running {
+        println!("  Warning: supervisor is running but the daemon is not (restarting or crashed)");
+    }
     println!();
 
     println!("Auto-start");
     // Absolute exe path to bake into the paste-ready PowerShell below, so the
     // suggested commands work verbatim without the loose autostart.ps1.
     let exe = env::current_exe().ok();
+    let task = probe_task();
+    match &task {
+        Some(info) => {
+            println!(
+                "  Task Scheduler: enabled  ({}{}{})",
+                info.path,
+                info.name,
+                if info.delay.is_empty() {
+                    String::new()
+                } else {
+                    format!(", delay {}", info.delay)
+                }
+            );
+            if !info.command.is_empty() {
+                println!("    -> {} {}", info.command, info.arguments);
+            }
+            if let Some(current) = exe.as_deref() {
+                if !info.command.is_empty() && !same_path(&info.command, current) {
+                    println!("    Warning: task points to a different executable; run enable to refresh it");
+                }
+            }
+            if !info.arguments.contains("--start-supervisor") {
+                println!("    Warning: task does not run --start-supervisor; run enable to refresh it");
+            }
+        }
+        None => println!("  Task Scheduler: not set"),
+    }
     let startup_enabled = matches!(startup_shortcut_path(), Some(p) if p.exists());
     match startup_shortcut_path() {
         Some(p) if p.exists() => println!("  Startup folder: enabled  ({})", p.display()),
@@ -51,7 +100,7 @@ pub fn run(daemon: &WindmenuDaemon) {
         Some(value) => println!("  Registry Run key: enabled  (HKCU\\{}\\{} -> {})", RUN_SUBKEY, RUN_VALUE_NAME, value),
         None => println!("  Registry Run key: not set"),
     }
-    print_autostart_hints(exe.as_deref(), startup_enabled, registry_enabled);
+    print_autostart_hints(exe.as_deref(), task.as_ref(), startup_enabled, registry_enabled);
 
     // A bare Windows Store app count isn't an actionable health signal, and the
     // detail already lives in `windmenu test reparse-points`. Kept commented in
@@ -66,25 +115,59 @@ pub fn run(daemon: &WindmenuDaemon) {
     // }
 }
 
-/// Print ready-to-paste PowerShell for toggling auto-start, with the absolute
-/// exe path baked in — the same actions as `autostart/autostart.ps1` (identical
-/// Run key/value and `.lnk` target + `start` args), so a bare `windmenu.exe`
-/// carries its own instructions without the loose helper script. Contextual:
-/// an *enable* line for each method that's off, a *disable* line for each on.
-fn print_autostart_hints(exe: Option<&std::path::Path>, startup_enabled: bool, registry_enabled: bool) {
-    let exe = match exe {
-        Some(p) => p.display().to_string(),
+/// Print ready-to-paste PowerShell for toggling auto-start. When the shipped
+/// helper sits next to the exe, point at it (it sets the exact auto-start
+/// task); otherwise print the equivalent manual commands with the absolute exe
+/// path baked in.
+fn print_autostart_hints(
+    exe: Option<&std::path::Path>,
+    task: Option<&TaskInfo>,
+    startup_enabled: bool,
+    registry_enabled: bool,
+) {
+    let exe_path = match exe {
+        Some(p) => p,
         // No exe path (env::current_exe failed) — the commands would be wrong.
         None => return,
     };
+    let exe = exe_path.display().to_string();
     let run_key = format!("HKCU:\\{}", RUN_SUBKEY);
     // A PowerShell-quoted `$env:APPDATA\...\windmenu.lnk`; inside single quotes a
     // literal `"` needs no escaping, so the baked paths stay readable.
     let lnk = "\"$([Environment]::GetFolderPath('Startup'))\\windmenu.lnk\"";
+    let active = task.is_some() || startup_enabled || registry_enabled;
+
+    if let Some(helper) = exe_path
+        .parent()
+        .map(|p| p.join("autostart.ps1"))
+        .filter(|p| p.exists())
+    {
+        println!();
+        if active {
+            println!("  Disable (paste into PowerShell):");
+            println!(
+                "    powershell -NoProfile -ExecutionPolicy Bypass -File \"{}\" disable",
+                helper.display()
+            );
+        } else {
+            println!("  Enable at login (paste into PowerShell) — Scheduled Task, no admin:");
+            println!(
+                "    powershell -NoProfile -ExecutionPolicy Bypass -File \"{}\" enable",
+                helper.display()
+            );
+        }
+        return;
+    }
 
     println!();
-    if startup_enabled || registry_enabled {
+    if active {
         println!("  Disable (paste into PowerShell):");
+        if let Some(info) = task {
+            println!(
+                "    Unregister-ScheduledTask -TaskName '{}' -TaskPath '{}' -Confirm:$false",
+                info.name, info.path
+            );
+        }
         if startup_enabled {
             println!("    Remove-Item {}", lnk);
         }
@@ -92,22 +175,131 @@ fn print_autostart_hints(exe: Option<&std::path::Path>, startup_enabled: bool, r
             println!("    Remove-ItemProperty -Path '{}' -Name '{}'", run_key, RUN_VALUE_NAME);
         }
     } else {
-        println!("  Enable at login (paste into PowerShell) — Startup shortcut, no admin:");
+        println!("  Enable at login — Scheduled Task (recommended, from the release zip):");
+        println!("    powershell -NoProfile -ExecutionPolicy Bypass -File <path-to-autostart.ps1> enable");
+        println!("  Enable at login — Startup shortcut, no admin:");
         println!(
-            "    $s=(New-Object -ComObject WScript.Shell).CreateShortcut({}); $s.TargetPath='{}'; $s.Arguments='start'; $s.Save()",
+            "    $s=(New-Object -ComObject WScript.Shell).CreateShortcut({}); $s.TargetPath='{}'; $s.Arguments='--start-supervisor'; $s.Save()",
             lnk, exe
         );
         println!("  Enable at login — Registry Run key:");
         println!(
-            "    Set-ItemProperty -Path '{}' -Name '{}' -Value '\"{}\" start'",
+            "    Set-ItemProperty -Path '{}' -Name '{}' -Value '\"{}\" --start-supervisor'",
             run_key, RUN_VALUE_NAME, exe
         );
     }
 }
 
+/// Read-only probe of the supervisor mutex. The daemon never opens this; it is
+/// only here so `doctor` can show whether the scheduled task's wrapper is up.
+fn supervisor_running() -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    use winapi::um::handleapi::CloseHandle;
+    use winapi::um::synchapi::OpenMutexW;
+    use winapi::um::winnt::SYNCHRONIZE;
+
+    let name: Vec<u16> = std::ffi::OsStr::new(SUPERVISOR_MUTEX)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        let handle = OpenMutexW(SYNCHRONIZE, 0, name.as_ptr());
+        if handle.is_null() {
+            false
+        } else {
+            CloseHandle(handle);
+            true
+        }
+    }
+}
+
+fn task_name() -> Option<String> {
+    env::var("USERNAME")
+        .ok()
+        .filter(|user| !user.is_empty())
+        .map(|user| format!("Autorun for {}", user))
+}
+
+/// Read the task's XML through `schtasks` (read-only) and pull out the action
+/// and trigger delay. Checks the `\Windmenu\` folder first, then the root
+/// fallback used when that folder cannot be created.
+fn probe_task() -> Option<TaskInfo> {
+    let name = task_name()?;
+    for path in [TASK_FOLDER, TASK_ROOT] {
+        let target = format!("{}{}", path, name);
+        let output = Command::new("schtasks")
+            .args(["/query", "/tn", &target, "/xml"])
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            continue;
+        }
+        let xml = decode_windows_output(&output.stdout);
+        return Some(TaskInfo {
+            path: path.to_string(),
+            name,
+            command: xml_tag(&xml, "Command")
+                .unwrap_or_default()
+                .trim_matches('"')
+                .to_string(),
+            arguments: xml_tag(&xml, "Arguments").unwrap_or_default(),
+            delay: xml_tag(&xml, "Delay").unwrap_or_default(),
+        });
+    }
+    None
+}
+
+/// `schtasks` output can be UTF-16LE (with or without a BOM) when redirected.
+fn decode_windows_output(bytes: &[u8]) -> String {
+    if let Some(rest) = bytes.strip_prefix(&[0xFF, 0xFE]) {
+        return decode_utf16_le(rest);
+    }
+    if let Some(rest) = bytes.strip_prefix(&[0xFE, 0xFF]) {
+        let units: Vec<u16> = rest
+            .chunks_exact(2)
+            .map(|c| u16::from_be_bytes([c[0], c[1]]))
+            .collect();
+        return String::from_utf16_lossy(&units);
+    }
+    if bytes.len() >= 2 && bytes[0] == b'<' && bytes[1] == 0 {
+        return decode_utf16_le(bytes);
+    }
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+fn decode_utf16_le(bytes: &[u8]) -> String {
+    let units: Vec<u16> = bytes
+        .chunks_exact(2)
+        .map(|c| u16::from_le_bytes([c[0], c[1]]))
+        .collect();
+    String::from_utf16_lossy(&units)
+}
+
+fn xml_tag(xml: &str, tag: &str) -> Option<String> {
+    let open = format!("<{}>", tag);
+    let close = format!("</{}>", tag);
+    let start = xml.find(&open)? + open.len();
+    let end = xml[start..].find(&close)? + start;
+    Some(xml_unescape(xml[start..end].trim()))
+}
+
+fn xml_unescape(s: &str) -> String {
+    s.replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&amp;", "&")
+}
+
+fn same_path(command: &str, current: &std::path::Path) -> bool {
+    command
+        .trim_matches('"')
+        .eq_ignore_ascii_case(&current.to_string_lossy())
+}
+
 /// `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\windmenu.lnk` —
 /// the shortcut written by the Scoop manifest and `autostart.ps1 enable`
-/// (default Startup method).
+/// (Startup fallback method).
 fn startup_shortcut_path() -> Option<PathBuf> {
     env::var("APPDATA").ok().map(|appdata| {
         PathBuf::from(appdata)
@@ -177,5 +369,36 @@ fn read_run_key() -> Option<String> {
         // Trim the trailing NUL(s) REG_SZ includes.
         let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
         Some(String::from_utf16_lossy(&buf[..end]))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{decode_windows_output, xml_tag, xml_unescape};
+
+    #[test]
+    fn reads_action_from_task_xml() {
+        let xml = r#"<Task><Actions Context="Author"><Exec>
+            <Command>C:\Tools\windmenu.exe</Command>
+            <Arguments>--start-supervisor</Arguments>
+        </Exec></Actions><Triggers><LogonTrigger><Delay>PT3S</Delay></LogonTrigger></Triggers></Task>"#;
+        assert_eq!(xml_tag(xml, "Command").as_deref(), Some(r"C:\Tools\windmenu.exe"));
+        assert_eq!(xml_tag(xml, "Arguments").as_deref(), Some("--start-supervisor"));
+        assert_eq!(xml_tag(xml, "Delay").as_deref(), Some("PT3S"));
+    }
+
+    #[test]
+    fn unescapes_xml_entities() {
+        assert_eq!(xml_unescape("a &amp; b &lt;c&gt; &quot;d&quot; &apos;e&apos;"), "a & b <c> \"d\" 'e'");
+    }
+
+    #[test]
+    fn decodes_utf16le_with_bom() {
+        let text = "<Command>C:\\x.exe</Command>";
+        let mut bytes = vec![0xFF, 0xFE];
+        for unit in text.encode_utf16() {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+        assert_eq!(decode_windows_output(&bytes), text);
     }
 }
