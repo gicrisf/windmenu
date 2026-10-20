@@ -14,6 +14,7 @@ mod daemon;
 mod doctor;
 mod history;
 mod menu;
+mod supervisor;
 mod theme;
 mod wlines;
 
@@ -29,6 +30,10 @@ struct Cli {
     /// Run as background daemon process (internal)
     #[arg(long, hide = true)]
     start_daemon_self_detached: bool,
+
+    /// Supervise the background daemon (internal, used by auto-start)
+    #[arg(long, hide = true)]
+    start_supervisor: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -229,6 +234,13 @@ fn main() {
         .unwrap_or_else(|| current_exe.clone());
 
     let windmenu_daemon = WindmenuDaemon::new(&windmenu_path);
+
+    if cli.start_supervisor {
+        // External lifecycle wrapper started by the scheduled task. It spawns
+        // the ordinary daemon below and never touches its state.
+        supervisor::run();
+        return;
+    }
 
     if cli.start_daemon_self_detached {
         // This is the background daemon process
