@@ -85,6 +85,8 @@ Write-Host ""
 $addStartup = Read-Host "Start windmenu automatically when you log in? (Y/n)"
 if ($addStartup -eq '' -or $addStartup -match '^[Yy]') {
     & powershell -NoProfile -ExecutionPolicy Bypass -File $autostart enable -ExePath $windmenuExe
+    Write-Host ""
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $autostart status
     Write-Host "  Disable later with: powershell -NoProfile -ExecutionPolicy Bypass -File `"$autostart`" disable" -ForegroundColor White
 } else {
     Write-Host "Skipped auto-start. Enable later with:" -ForegroundColor Yellow

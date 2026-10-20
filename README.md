@@ -30,7 +30,7 @@ Press `Ctrl+Alt+Space` to launch.
 
 ### Option 2: ZIP
 
-The previous script downloads the latest release to `$HOME\.windmenu`, optionally adds it to your PATH, and lets you select an autostart method.
+The previous script downloads the latest release to `$HOME\.windmenu`, optionally adds it to your PATH, and offers to set up auto-start (a Scheduled Task at logon +3s, with a Startup-shortcut fallback).
 
 You can do the exact same thing manually:
 - Download [`windmenu.zip`](https://github.com/gicrisf/windmenu/releases/latest)

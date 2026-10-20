@@ -1,3 +1,10 @@
+## Supervised auto-start
+
+- Auto-start now uses a per-user Scheduled Task (`\Windmenu\Autorun for <user>`) triggered at logon with a 3-second delay: specific-user logon trigger, `InteractiveToken`, least privilege, batteries allowed, no execution time limit, `StartWhenAvailable=false`, no restart-on-failure. If Task Scheduler is blocked, `autostart.ps1` warns and falls back to the Startup-folder shortcut
+- The task launches a new lightweight supervisor (`windmenu.exe --start-supervisor`), which starts the ordinary daemon and respawns it if it exits with a failure. The daemon keeps its single-process behavior: `windmenu start` / `stop` / `restart` are unchanged, and `windmenu stop` also stops the supervisor so it cannot resurrect the daemon
+- `--start-supervisor` is an internal flag; the daemon never opens the supervisor mutex. `windmenu doctor` reports the supervisor and Scheduled Task state, flags a stale task executable path, and points at `autostart.ps1` for the exact enable/disable command
+- Hotkey registration at startup now retries for 60 seconds when another app briefly holds the combo, instead of failing immediately and showing an error box
+
 ## Flatter CLI (0.7.0)
 
 - Daemon commands are now top-level: `windmenu start` / `stop` / `restart` (previously nested under `windmenu daemon …`). Bare `windmenu` now prints help instead of starting the daemon — use `windmenu start`
